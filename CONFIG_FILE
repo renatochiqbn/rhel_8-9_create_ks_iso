@@ -10,24 +10,82 @@
 # ISOSRCDIR=""
 
 # OEM Source Media File Name
-#OEMSRCISO="rhel-8.7-x86_64-dvd.iso"
+OEMSRCISO="Linux-RHEL-8.9-x86_64-dvd.iso"
 
 # Create new full boot ISO
-#CREATEBOOTISO="true"
+CREATEBOOTISO="true"
+
+# Insert ks.cfg in boot ISO (Cases where second OEMDRV ISO may not be an option)
+KSINBOOTISO="true"
+#KSINBOOTISO="false"
+
+## New ISO file suffix. Adds suffix to iso name. Ex: isoname_suffix.iso
+# Randomly generate a string for serialization
+# Combine suffixes with date in YYYY-MM-DD format
+ADDSUFFIX="true"
+
+# Kickstart file location passed to bootloader when KSINBOOTISO is set
+# Default is on the ISO file, but could be a network location
+KSLOCATION="hd:LABEL=RHEL-8-9-0-BaseOS-x86_64:\/ks.cfg"
 
 # Create OEMDRV volume ISO
 #CREATEOEMDRVISO="true"
 
 # FIPS Mode
-#ENABLEFIPS="true"
+ENABLEFIPS="true"
 
 # Write plaintext passwords to files
 # Generally uneeded, but useful for console testing.
 # NOT Recommended to write plaintext passwords out.
-# WRITEPASSWDS="false"
+WRITEPASSWDS="true"
 
 # Root password - Specify a password in plain text.
 # Generally uneeded, but useful for console testing.
 # NOT Recommended to write plaintext passwords out.
 #password=""
 
+# Set default OS. (Options: "RHEL" or "CentOS")
+OSTYPE="RHEL" 
+
+#RHEL OS major version. (Options: "8" or "9")
+MAJOROSVERSION="8"
+
+#######################
+# Kickstart Variables #
+#######################
+
+# Custom admin account
+username_03="csadmin"
+password_username_03='changeme'
+
+## Enable drive encryption by LUKS
+ENABLELUKS="true"
+
+## Offline Repo changes.
+# Enable offline repo
+ISOFFLINEREPO="false" #Default if not defined
+# Offline repo location
+OFFLINEREPO='http://repo8/configs/offline_redhat8.repo' #Default if not defined
+
+# NOTE: Timezone names are sourced from the python pytz.all_timezones list
+TIMEZONE="Etc/UTC"
+
+# Change this setting to the local NTP server. Comma delimited.
+NTP_SERVERS=""
+
+## Logical volume sizes. NO COMMAS!!!
+# / filesystem logical volume size
+LOGVOLSIZEROOT="40960"
+# /home filesystem logical volume size
+LOGVOLSIZEHOME="18332"
+
+# Applies DISA-STIG for RHEL8/9. See https://static.open-scap.org/ssg-guides/ssg-rhel8-guide-stig.html or https://static.open-scap.org/ssg-guides/ssg-rhel9-guide-stig.html
+APPLYOPENSCAPSTIG="true"
+
+# Enable to set virtualization options. Only enable on bare metal installs. Not tested in VM environments.
+ISVIRTUALPLATFORM="true"
+PCIPASSTHROUGH="true"
+INTELCPU="true"
+
+# Enable serial console display
+SERIALDISPLAY="true"

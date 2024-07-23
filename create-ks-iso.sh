@@ -18,6 +18,20 @@ echo -e "$0: Starting at $(date)"
 # ks.cfg command syntax varies between RHEL 8.x and 9.x
 : "${MAJOROSVERSION:=9}" # Default if not defined
 
+##############################
+## File serialization : WIP ##
+##############################
+
+## New ISO file suffix. Adds suffix to iso name. Ex: isoname_suffix.iso
+: "${ADDSUFFIX:="true"}" # Default if not defined
+
+if [ "$ADDSUFFIX" = "true" ]; then
+  # Randomly generate a string for serialization
+  SUFFIX01="_$(LC_ALL=C od -vN 6 -ax /dev/urandom | tail -n +2 | tr -dc '[:graph:]' | head -c 6)"
+  # Combine suffixes with date in YYYY-MM-DD format
+  NEWISONAMESUFFIX=$SUFFIX01'_'$(date +%Y-%m-%d)'_'
+fi
+
 ############################
 ## ISO Creation Variables ##
 ############################
@@ -49,7 +63,7 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 : "${OEMDRVISOFILENAME:=OEMDRV}" # Default if not defined
 
 # Location for generated credentials
-: "${CREDSDIR:=$OUTPUTDIR/creds}" # Default if not defined
+: "${CREDSDIR:=$OUTPUTDIR/creds$SUFFIX01}" # Default if not defined
 
 # Source Media ISO Location
 : "${ISOSRCDIR:=$SRCDIR/isosrc}" # Default if not defined
@@ -61,7 +75,10 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 #: "${OEMSRCISO:=rhel-9.2-x86_64-dvd.iso}" # Default if not defined
 
 # New ISO file prefix
-: "${NEWISONAMEPREFIX:=}" # Default if not defined
+: "${NEWISONAMEPREFIX:=$NEWISONAMESUFFIX}" # Default if not defined
+
+# New ISO file suffix : WIP
+# : "${NEWISONAMESUFFIX:=}" # Default if not defined
 
 # File Name for newly-created final ISO file
 : "${NEWISONAME:=$NEWISONAMEPREFIX$OEMSRCISO}" # Default if not defined
@@ -74,7 +91,7 @@ SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
 : "${KSCFGDESTFILENAME:=ks.cfg}" # Default if not defined
 
 # kickstart file Result/Output Location
-: "${KSRESULTDIR:=$OUTPUTDIR/ks}" # Default if not defined
+: "${KSRESULTDIR:=$OUTPUTDIR/ks$SUFFIX01}" # Default if not defined
 
 # Kickstart file location passed to bootloader when KSINBOOTISO is set
 # Default is on the ISO file, but could be a network location
@@ -124,6 +141,12 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 : "${username_02_uid:=5002}" # Default if not defined
 : "${username_02_gid:=5002}" # Default if not defined
 
+# Regular Admin Account
+: "${username_03:=csadmin}" # Default if not defined
+: "${username_03_gecos:=Regular Admin Account}" # Default if not defined
+: "${username_03_uid:=5003}" # Default if not defined
+: "${username_03_gid:=5003}" # Default if not defined
+
 # Password length 
 : "${passwd_len:=16}" # Default if not defined
 
@@ -152,6 +175,9 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 # Swap defaults to OS recommended values
 : "${LOGVOLSIZESWAP:=recommended}" # Default if not defined
 
+## Enable drive encryption by LUKS
+: "${ENABLELUKS:=true}"
+
 ## System Time Settings
 # Timezone (required)
 # NOTE: Timezone names are sourced from the python pytz.all_timezones list
@@ -171,7 +197,55 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 ## Installer Behavior Options
 # Disable interactive installer prompts
 : "${FIRSTBOOT:=false}" # Default if not defined
+# Serial Console Display
+: "${SERIALDISPLAY:=false}" # Default if not defined
 
+## Additional Packages
+# Enable to set virtualization options.
+: "${ISVIRTUALPLATFORM:=false}" #Default if not defined
+: "${PCIPASSTHROUGH:=false}" #Default if not defined
+: "${INTELCPU:=false}" #Default if not defined
+
+## Offline Repo changes.
+# Enable offline repo
+: "${ISOFFLINEREPO:=false}" #Default if not defined
+# Offline repo location
+: "${OFFLINEREPO:='http://repo8/configs/offline_redhat8.repo'}" #Default if not defined
+
+########################
+# Virtualization Tweaks#
+########################
+if [ "$ISVIRTUALPLATFORM" = "true" ]; then
+  if [ "$PCIPASSTHROUGH" = "true" ]; then
+  #Set grub settings for PCI passthrough
+   PCI_PT="iommu=pt"
+    if [ "$INTELCPU" = "true" ]; then
+      PCI_PT+=" intel_iommu=on" # Intel only
+    else
+      PCI_PT+=" iommu=1" # AMD only
+    fi
+  fi
+
+# Additional virtualization packages here
+VIRTUALIZATIONPLATFORM="@virtualization-platform"
+VIRTUALIZATIONHYPERVISOR="@virtualization-hypervisor"
+VIRTUALIZATIONTOOLS="@virtualization-tools"
+VIRTUALIZATIONCLIENT="@virtualization-client"
+fi
+
+########################
+# Serial Display Tweaks#
+########################
+if [ "$SERIALDISPLAY" = "true" ]; then
+  GRUBTWEAK="console=tty0 console=ttyS0,115200"
+fi
+
+########################
+# GRUB Tweaks#
+########################
+if [ "$ISVIRTUALPLATFORM" = "true" ]; then
+  GRUBTWEAK+=" $PCI_PT"
+fi
 ########################
 # Function Definitions #
 ########################
@@ -253,6 +327,8 @@ if [ "$CREATEBOOTISO" = "true" ]; then
     NEWISONAME=$NEWISONAMEPREFIX$OEMSRCISO
   fi
 fi 
+
+echo -e "$0: New ISO File $ISORESULTDIR/iso/$NEWISONAME."
 
 ## Network Configuration Logic
 
@@ -408,11 +484,11 @@ echo "$0: Required files and directory checks passed."
 check_dependency grub2-mkpasswd-pbkdf2
 
 # If passwords are not defined, they'll be generated with openssl, check for openssl
-if [[ -z "$password" || -z "$password_username_01" || -z "$password_username_02" ]] ; then
+if [[ -z "$password" || -z "$password_username_01" || -z "$password_username_02" || -z "$password_username_03" ]] ; then
   check_dependency openssl
 fi
 
-if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" ]] ; then
+if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" || -z "$ssh_pub_key_username_03" ]] ; then
   check_dependency ssh-keygen
 fi
 
@@ -472,6 +548,7 @@ fi
 : "${password:=$( generate_random_passwd )}" || { echo "$0: root password generation ERROR, exiting..."; exit 1; }
 : "${password_username_01:=$( generate_random_passwd )}" || { echo "$0: $username_01 password generation ERROR, exiting..."; exit 1; }
 : "${password_username_02:=$( generate_random_passwd )}" || { echo "$0: $username_02 password generation ERROR, exiting..."; exit 1; }
+: "${password_username_03:=$( generate_random_passwd )}" || { echo "$0: $username_03 password generation ERROR, exiting..."; exit 1; }
 
 # grub2 bootloader password
 : "${grub2_passwd:=$( generate_random_passwd )}" || { echo "$0: grub2 bootloader password generation ERROR, exiting..."; exit 1; }
@@ -487,6 +564,7 @@ case $WRITEPASSWDS in
   echo "$password" > "$CREDSDIR"/password.txt
   echo "$password_username_01" > "$CREDSDIR"/password_"${username_01}".txt
   echo "$password_username_02" > "$CREDSDIR"/password_"${username_02}".txt
+  echo "$password_username_03" > "$CREDSDIR"/password_"${username_03}".txt
   echo "$grub2_passwd" > "$CREDSDIR"/password_grub2.txt
   ;;
 *)
@@ -497,6 +575,7 @@ esac
 encrypted_password=$( encrypt_random_passwd "$password" ) || { echo "$0: root password encryption ERROR, exiting..."; exit 1; }
 encrypted_password_username_01=$( encrypt_random_passwd "$password_username_01"  ) || { echo "$0: $username_01 password encryption ERROR, exiting..."; exit 1; }
 encrypted_password_username_02=$( encrypt_random_passwd "$password_username_02" ) || { echo "$0: $username_02 password encryption ERROR, exiting..."; exit 1; }
+encrypted_password_username_03=$( encrypt_random_passwd "$password_username_03" ) || { echo "$0: $username_03 password encryption ERROR, exiting..."; exit 1; }
 
 # Generate grub2 bootloader password, unfortunately the grub2-mkpasswd-pbkdf2
 # command is interactive, so we have to emulate the keypresses:
@@ -505,7 +584,7 @@ grub2_encrypted_passwd=$(echo -e "$grub2_passwd\n$grub2_passwd" | grub2-mkpasswd
 ### SSH Key Generation
 ## Generated key pairs will be written to $CREDSDIR
 
-if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" ]] ; then
+if [[ -z "$ssh_pub_key_username_01" || -z "$ssh_pub_key_username_02" || -z "$ssh_pub_key_username_03" ]] ; then
   # Remove old randomly-generated ssh keys
   rm -f "$CREDSDIR"/*.id_rsa "$CREDSDIR"/*.pub
 fi
@@ -522,6 +601,13 @@ if [[ -z "$ssh_pub_key_username_02" ]] ; then
   generate_ssh_keys "$username_02"
   ssh_pub_key_username_02=$(<"$CREDSDIR/${username_02}".id_rsa.pub)
   echo -e "$0: SSH keys for $username_02 created at $(date)"
+fi
+
+if [[ -z "$ssh_pub_key_username_03" ]] ; then
+  # Create ssh key pairt for user 3 (Regular Admin Account)
+  generate_ssh_keys "$username_03"
+  ssh_pub_key_username_03=$(<"$CREDSDIR/${username_03}".id_rsa.pub)
+  echo -e "$0: SSH keys for $username_03 created at $(date)"
 fi
 
 # Generate a random disk encryption password
@@ -571,10 +657,13 @@ cat <<EOF > "$SRCDIR"/ks.cfg
 # Perform installation from the first optical drive on the system. (optional)
 #   Use CDROM installation media, NOTE: This requires the full install DVD ISO. 
 #   The netboot iso is only for pointing to a remote install repository.
-cdrom
+#cdrom
+#harddrive --partition=/dev/sdb1 --dir=/ #No success
+url --url=file:///run/install/repo
 
 # Install method (optional) 
-cmdline
+#cmdline
+text
 
 EOF
 
@@ -610,6 +699,9 @@ selinux --enforcing
 # in the installer environment (optional)
 $network_config
 
+# Initial Setup is not started the first time the system boots. 
+firstboot --disable
+
 # Set the system time zone (required)
 $timezone_config
 EOF
@@ -626,6 +718,27 @@ if [[ "$MAJOROSVERSION" -ge "9" ]] && [[ "$USENTP" = "false" ]]; then
   echo "# NTP Not Used" >> "$SRCDIR"/ks.cfg
   echo "timesource --ntp-disable" >> "$SRCDIR"/ks.cfg
 fi
+
+###########################################################
+# WIP: Select install location disk that is not removable #
+###########################################################
+# %pre
+
+# # Get all block devices except for potential SD card readers (modify as needed)
+# all_disks=$(lsblk -lnpo pkname | grep -v sd$ | grep -v mmcblk$ )
+
+# # Choose the first non-removable disk (modify as needed)
+# install_disk=${all_disks%% *}
+
+# # Log the selected installation drive
+# echo "Selected installation drive: $install_disk"
+
+# %end
+
+##################################################################
+# End of WIP: Select install location disk that is not removable #
+##################################################################
+
 
 cat <<EOF >> "$SRCDIR"/ks.cfg
 
@@ -665,7 +778,7 @@ logvol /tmp  --fstype='xfs' --size=$LOGVOLSIZETMP --name=tmp --vgname=vg00 --fso
 # Ensure /home Located On Separate Partition
 logvol /home  --fstype='xfs' --size=$LOGVOLSIZEHOME --name=home --vgname=vg00 --fsoptions='nodev,noexec'
 # Ensure /var Located On Separate Partition
-logvol /var  --fstype='xfs' --size=$LOGVOLSIZEVAR --name=var --vgname=vg00 --fsoptions='nodev'
+logvol /var  --fstype='xfs' --size=$LOGVOLSIZEVAR --name=var --vgname=vg00 --grow --fsoptions='nodev'
 # Ensure /var/log Located On Separate Partition
 logvol /var/log  --fstype='xfs' --size=$LOGVOLSIZEVARLOG --name=varlog --vgname=vg00 --fsoptions='nodev'
 # Ensure /var/tmp Located On Separate Partition
@@ -675,15 +788,23 @@ logvol /var/log/audit  --fstype='xfs' --size=$LOGVOLSIZEVARLOGAUDIT --name=varlo
 # Third-party tools and agents require free space in /opt
 logvol /opt  --fstype='xfs' --size=$LOGVOLSIZEOPT --name=opt --vgname=vg00 --fsoptions='nodev'
 
+EOF
+
+
+# Remember to remove/disable swap if hosting K8S, Elasticsearch, etc.
+if [ "$ISVIRTUALPLATFORM" = "false" ]; then
+cat <<EOF >> "$SRCDIR"/ks.cfg
 # Remember to remove/disable swap if hosting K8S, Elasticsearch, etc.
 logvol swap  --$LOGVOLSIZESWAP --fstype='swap' --name=swap --vgname=vg00 
 ## End boot partition information
+EOF
+fi
 
+cat <<EOF >> "$SRCDIR"/ks.cfg
 ## Kickstart/anaconda addons
 # STIG Requirement: Disable kdump
 %addon com_redhat_kdump --disable
 %end
-
 EOF
 
 # Each OpenSCAP addon section is slightly different depending on OSTYPE and MAJORVERSION
@@ -727,6 +848,15 @@ if [ "$APPLYOPENSCAPSTIG" = "true" ]; then
 fi
 
 
+if [ "$ISVIRTUALPLATFORM" = "true" ]; then
+##Set additional virtualization packages here
+VIRTUALIZATIONPLATFORM=@virtualization-platform
+VIRTUALIZATIONHYPERVISOR=@virtualization-hypervisor
+VIRTUALIZATIONTOOLS=@virtualization-tools
+LIBVIRT="libvirt"
+VIRTUALIZATIONCLIENT=@virtualization-client
+fi
+
 cat <<EOF >> "$SRCDIR"/ks.cfg
 %packages
 # Specify an entire environment to be installed as a line starting with the @^ symbols.
@@ -734,18 +864,25 @@ cat <<EOF >> "$SRCDIR"/ks.cfg
 # If more environments are specified, only the last specified environment is used.
 # Define a minimal system environment
 @^minimal-environment
+@security-tools
+#Virtual packages.
+$VIRTUALIZATIONCLIENT
+$VIRTUALIZATIONPLATFORM
+$VIRTUALIZATIONHYPERVISOR
+$VIRTUALIZATIONTOOLS
+$LIBVIRT
 # Initial Setup application starts the first time the system is booted, required
 # when firstboot option is set above. 
-initial-setup
+# initial-setup # Do not set when 'firstboot --disable'
 # Provides 'needs-restarting,' used for post-install check if reboot required
 dnf-utils
 # STIG-required packages:
 # With STIG oscap profile applied, login will fail unless tmux is installed
 tmux
+selinux-policy-targeted
 # Various package findings are mitigated with the following. Installed here because oscap
 # calls yum to install STIG-required packages, but networking is not yet configured and 
 # Red Hat subscriptions have not yet been registered:
-aide
 audispd-plugins
 chrony
 dnf-automatic
@@ -757,6 +894,45 @@ python3
 rng-tools
 rsyslog-gnutls
 usbguard
+## Additional packages.
+nano
+open-vm-tools
+opensc
+openscap-scanner
+openssh-server
+openssl-pkcs11
+policycoreutils
+postfix
+rsyslog
+wget
+dialog
+perl
+-abrt
+-abrt-addon-ccpp
+-abrt-addon-kerneloops
+-abrt-cli
+-abrt-plugin-sosreport
+-cockpit
+-cockpit-ws
+-cockpit-system
+-subscription-manager-cockpit
+-iprutils
+-krb5-server
+-krb5-workstation
+-libreport-plugin-logger
+-libreport-plugin-rhtsupport
+-python3-abrt-addon
+-rsh-server
+-sendmail
+-telnet-server
+-tftp-server
+-tuned
+-vsftpd
+-xorg-x11-server-Xorg
+-xorg-x11-server-Xwayland
+-xorg-x11-server-common
+-xorg-x11-server-utils
+-subscription-manager-cockpit
 %end
 
 ## Bootloader section
@@ -764,18 +940,56 @@ usbguard
 # This password hash must be generated by: grub2-mkpasswd-pbkdf2
 EOF
 
+## Applies offline repo configuration
+if [ "$ISOFFLINEREPO" = "true" ]; then
+cat <<EOF >> "$SRCDIR"/ks.cfg
+%post
+##########################################
+#####  REPO Fix for RHEL8            #####
+##########################################
+####
+# Repo Fix for RHEL8
+####
+# move all repository files
+mkdir /etc/yum.repos.d/old
+mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/old/
+cp /root/offline_redhat8.repo /etc/yum.repos.d/
+# download repository files updates
+curl http://repo8/configs/offline_redhat8.repo --output /etc/yum.repos.d/offline_redhat8.repo
+# apply software updates
+yum -y update
+# remove Redhat default repos
+#rm -rf /etc/yum.repos.d/redhat.rep
+yum clean all
+%end
+EOF
+fi
+
 case $ENABLEFIPS in
   true)
-cat <<EOF >> "$SRCDIR"/ks.cfg
-bootloader --append "fips=1" --iscrypted --password=$grub2_encrypted_passwd
+    case $ENABLELUKS in
+      true)
+        cat <<EOF >> "$SRCDIR"/ks.cfg
+bootloader --append "fips=1 $GRUBTWEAK" --iscrypted --password=$grub2_encrypted_passwd
 
 EOF
-  ;;
-*)
-cat <<EOF >> "$SRCDIR"/ks.cfg
+        ;;
+      false)
+        cat <<EOF >> "$SRCDIR"/ks.cfg
+bootloader --append "fips=1 $GRUBTWEAK"
+
+EOF
+        ;;
+    esac
+    ;;
+  *)
+    if [ "$ENABLELUKS" = "true" ]; then
+      cat <<EOF >> "$SRCDIR"/ks.cfg
 bootloader --iscrypted --password=$grub2_encrypted_passwd
 
 EOF
+    fi
+    ;;
 esac
 
 cat <<EOF >> "$SRCDIR"/ks.cfg
@@ -786,46 +1000,67 @@ rootpw --iscrypted $encrypted_password
 # User Notes: Users in group wheel can sudo and elevate. Direct root login is only allowed from console.
 user --name=$username_01 --groups=wheel --gecos='$username_01_gecos' --uid=$username_01_uid --gid=$username_01_gid --password=$encrypted_password_username_01 --iscrypted
 user --name=$username_02 --groups=wheel --gecos='$username_02_gecos' --uid=$username_02_uid --gid=$username_02_gid --password=$encrypted_password_username_02 --iscrypted
+user --name=$username_03 --groups=wheel --gecos='$username_03_gecos' --uid=$username_03_uid --gid=$username_03_gid --password=$encrypted_password_username_03 --iscrypted
 
 # sshkey (optional)
 # Adds SSH key to the authorized_keys file of the specified user
 # sshkey --username=user "ssh_key"
 sshkey --username=$username_01 "$ssh_pub_key_username_01"
 sshkey --username=$username_02 "$ssh_pub_key_username_02"
+sshkey --username=$username_03 "$ssh_pub_key_username_03"
 
+EOF
+
+if [ "$ENABLELUKS" = "true" ]; then
+cat <<EOF >> "$SRCDIR"/ks.cfg
 # Create encrypted LVM pv with all available disk space
 partition pv.01 --fstype='lvmpv' --grow --size=1 --encrypted --luks-version=luks2 --passphrase=$random_luks_passwd
 
+EOF
+else
+cat <<EOF >> "$SRCDIR"/ks.cfg
+# Create non-encrypted LVM pv with all available disk space
+partition pv.01 --fstype='lvmpv' --grow --size=1 
+
+EOF
+fi
+
+cat <<EOF >> "$SRCDIR"/ks.cfg
 %post
 # Allow provisioning account to sudo without password for initial 
 # systems configuration. Configure per policy once system is provisioned/deployed.
-cat >> /etc/sudoers.d/provisioning << EOF_sudoers
-### Allow these accounts sudo access with no password until system fully deployed ###
-$username_01 ALL=(ALL) NOPASSWD: ALL
-$username_02 ALL=(ALL) NOPASSWD: ALL
-EOF_sudoers
-chown root:root /etc/sudoers.d/provisioning
-chmod 0440 /etc/sudoers.d/provisioning
+# cat >> /etc/sudoers.d/provisioning << EOF_sudoers
+# ### Allow these accounts sudo access with no password until system fully deployed ###
+# #$username_01 ALL=(ALL) NOPASSWD: ALL
+# #$username_02 ALL=(ALL) NOPASSWD: ALL
+# #$username_03 ALL=(ALL) NOPASSWD: ALL
+# EOF_sudoers
+# chown root:root /etc/sudoers.d/provisioning
+# chmod 0440 /etc/sudoers.d/provisioning
 
 # Modify /etc/issue with provisioning information
-cat >> /etc/issue << EOF_issue
+# cat >> /etc/issue << EOF_issue
 
-INFO: This system was provisioned with kickstart. 
-INFO: kickstart file generated using $0 by $USER at $(date).
-INFO: Unless specified at the time of kickstart generation: 
-INFO: User credentials, including passwords and SSH keys, were randomly generated.
+# INFO: This system was provisioned with kickstart. 
+# INFO: kickstart file generated using $0 by $USER at $(date).
+# INFO: Unless specified at the time of kickstart generation: 
+# INFO: User credentials, including passwords and SSH keys, were randomly generated.
 
-WARNING: This system is in a minimal configuration state. 
-WARNING: Further system configuration and security hardening is required.
+# WARNING: This system is in a minimal configuration state. 
+# WARNING: Further system configuration and security hardening is required.
 
-Remove this message by updating the /etc/issue file.
+# Remove this message by updating the /etc/issue file.
 
-EOF_issue
+# EOF_issue
 
 ## Set password change date to yesterday, prevents SSH access issues once STIGs are applied
 chage -d \$(date -d -1days +%Y-%m-%d) root
 chage -d \$(date -d -1days +%Y-%m-%d) $username_01
 chage -d \$(date -d -1days +%Y-%m-%d) $username_02
+chage -d \$(date -d -2days +%Y-%m-%d) $username_03
+
+# force password change at login
+chage -d 0 $username_03
 
 ## Set up LUKS pv decryption unlock
 # Create a [long] random key and place it in file
@@ -842,8 +1077,17 @@ echo 'install_items+=" /crypto_keyfile.bin "' > /etc/dracut.conf.d/include_crypt
 # Configure crypttab to look for the keyfile to auto-unlock all volumes (will use the version stored in the initramfs)
 sed -i "s#\bnone\b#/crypto_keyfile.bin#" /etc/crypttab
 
+## Changes values to meet DISA STIG
+# Disables bluetooth
+sed -i "s/true/false/" /etc/modprobe.d/bluetooth.conf
+# Disables usb storage
+sed -i "s/true/false/" /etc/modprobe.d/usb-storage.conf
+# Set value to meet stig
+sed -i "s/StopIdleSessionSec=300/StopIdleSessionSec=900/" /etc/systemd/logind.conf
+
 # Rebuild the initramfs
 dracut -f
+fips-mode-setup --enable
 
 # Lock everyone out of the keyfile
 chmod 000 /crypto_keyfile.bin
@@ -889,13 +1133,13 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "true" ]; then
     # Modify isolinux.cfg for FIPS mode and ks boot
     echo -e "$0: Setting FIPS mode and ks.cfg location in ISO bootloader (FIPS: ON, kickstart in ISO: ON)"
-    sed -i "/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=$KSLOCATION quiet/" "$WORKDIR"/isolinux/isolinux.cfg
+    sed -i "/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=$KSLOCATION $GRUBTWEAK quiet/" "$WORKDIR"/isolinux/isolinux.cfg
     # Modify grub.cfg for FIPS mode and ks boot
-    sed -i "/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=$KSLOCATION quiet/" "$WORKDIR"/EFI/BOOT/grub.cfg
-    # Modify isolinux.cfg menu title
-    sed -i 's/menu label Install/menu label FIPS mode with kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg
+    sed -i "/rescue/!s/ quiet/ rd.fips fips=1 inst.ks=$KSLOCATION $GRUBTWEAK quiet/" "$WORKDIR"/EFI/BOOT/grub.cfg
+    # Modify isolinux.cfg MENU TITLE
+    sed -i "s/menu label Install/menu label FIPS mode with kickstart with GRUBTWEAKs Install/" "$WORKDIR"/isolinux/isolinux.cfg
     # Modify grub.cfg menu entries
-    sed -i 's/Install/FIPS mode with kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
+    sed -i "s/Install/FIPS mode with kickstart with GRUBTWEAKs Install/" "$WORKDIR"/EFI/BOOT/grub.cfg
     sed -i 's/Test/FIPS mode with kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
     # Copy ks.cfg into working dir
     cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
@@ -905,28 +1149,28 @@ if [ "$CREATEBOOTISO" = "true" ]; then
   if [ "$ENABLEFIPS" = "false" ] && [ "$KSINBOOTISO" = "true" ]; then
       # Modify isolinux.cfg ks boot, no FIPS mode
       echo -e "$0: Setting ks.cfg location in ISO bootloader (FIPS: OFF, kickstart in ISO: ON)"
-      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION quiet/" "$WORKDIR"/isolinux/isolinux.cfg
+      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION $GRUBTWEAK quiet/" "$WORKDIR"/isolinux/isolinux.cfg
       # Modify grub.cfg for ks boot, no FIPS mode
-      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION quiet/" "$WORKDIR"/EFI/BOOT/grub.cfg
-      # Modify isolinux.cfg menu title
-      sed -i 's/menu label Install/menu label kickstart Install/' "$WORKDIR"/isolinux/isolinux.cfg
+      sed -i "/rescue/!s/ quiet/ inst.ks=$KSLOCATION $GRUBTWEAK quiet/" "$WORKDIR"/EFI/BOOT/grub.cfg
+      # Modify isolinux.cfg MENU TITLE
+      sed -i "s/menu label Install/menu label kickstart with GRUBTWEAKs Install/" "$WORKDIR"/isolinux/isolinux.cfg
       # Modify grub.cfg menu entries to show RandomCreds
-      sed -i 's/Install/kickstart Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
-      sed -i 's/Test/kickstart Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+      sed -i "s/Install/kickstart with GRUBTWEAKs Install/" "$WORKDIR"/EFI/BOOT/grub.cfg
+      sed -i "s/Test/kickstart with GRUBTWEAKs Test/" "$WORKDIR"/EFI/BOOT/grub.cfg
       # Copy ks.cfg into working dir
       cp "$SRCDIR"/"$KSCFGSRCFILE" "$WORKDIR"/"$KSCFGDESTFILENAME"
   fi
 
   # FIPS mode enabled, do not insert ks.cfg into boot ISO
   if [ "$ENABLEFIPS" = "true" ] && [ "$KSINBOOTISO" = "false" ]; then
-      # Modify isolinux.cfg menu title
+      # Modify isolinux.cfg MENU TITLE
       echo -e "$0: Setting FIPS mode in ISO bootloader (FIPS: ON, kickstart in ISO: OFF)"
-      sed -i 's/menu label Install/menu label FIPS mode Install/' "$WORKDIR"/isolinux/isolinux.cfg
+      sed -i "s/menu label Install/menu label FIPS mode with GRUBTWEAKs Install/" "$WORKDIR"/isolinux/isolinux.cfg
       # Modify grub.cfg for FIPS mode
-      sed -i '/rescue/!s/ quiet/ rd.fips fips=1 quiet/' "$WORKDIR"/EFI/BOOT/grub.cfg
+      sed -i "/rescue/!s/ quiet/ rd.fips fips=1 $GRUBTWEAK quiet/" "$WORKDIR"/EFI/BOOT/grub.cfg
       # Modify grub.cfg menu entries to show RandomCreds
-      sed -i 's/Install/FIPS mode Install/' "$WORKDIR"/EFI/BOOT/grub.cfg
-      sed -i 's/Test/FIPS mode Test/' "$WORKDIR"/EFI/BOOT/grub.cfg
+      sed -i "s/Install/FIPS mode with GRUBTWEAKs Install/" "$WORKDIR"/EFI/BOOT/grub.cfg
+      sed -i "s/Test/FIPS mode with GRUBTWEAKs Test/" "$WORKDIR"/EFI/BOOT/grub.cfg
   fi
 
   # Create new ISO  
