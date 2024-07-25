@@ -915,10 +915,11 @@ perl
 -cockpit
 -cockpit-ws
 -cockpit-system
+-gssproxy
 -subscription-manager-cockpit
 -iprutils
 -krb5-server
--krb5-workstation
+#-krb5-workstation
 -libreport-plugin-logger
 -libreport-plugin-rhtsupport
 -python3-abrt-addon
@@ -1082,6 +1083,16 @@ sed -i "s#\bnone\b#/crypto_keyfile.bin#" /etc/crypttab
 sed -i "s/true/false/" /etc/modprobe.d/bluetooth.conf
 # Disables usb storage
 sed -i "s/true/false/" /etc/modprobe.d/usb-storage.conf
+# Disables atm
+sed -i "s/true/false/" /etc/modprobe.d/atm.conf
+# Disables cramfs
+sed -i "s/true/false/" /etc/modprobe.d/cramfs.conf
+# Disables firewire-core
+sed -i "s/true/false/" /etc/modprobe.d/firewire-core.conf
+# Disables tipc
+sed -i "s/true/false/" /etc/modprobe.d/tipc.conf
+# Disables sctp
+sed -i "s/true/false/" /etc/modprobe.d/sctp.conf
 # Set value to meet stig
 sed -i "s/StopIdleSessionSec=300/StopIdleSessionSec=900/" /etc/systemd/logind.conf
 

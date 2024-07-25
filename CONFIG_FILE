@@ -54,8 +54,19 @@ MAJOROSVERSION="8"
 # Kickstart Variables #
 #######################
 
+# Service admin account for ansible
+username_01="csansible"
+#username_01_gecos:=Ansible Service Account
+#password_username_03='changeme'
+
+# Service admin account for nessus
+username_02="csacas"
+username_02_gecos="Nessus Admin Account"
+#password_username_03='changeme'
+
 # Custom admin account
 username_03="csadmin"
+username_03_gecos="Regular Admin Account"
 password_username_03='changeme'
 
 ## Enable drive encryption by LUKS
