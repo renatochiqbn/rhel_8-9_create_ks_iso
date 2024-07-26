@@ -18,6 +18,16 @@ echo -e "$0: Starting at $(date)"
 # ks.cfg command syntax varies between RHEL 8.x and 9.x
 : "${MAJOROSVERSION:=9}" # Default if not defined
 
+# Minor OS Version number
+# Used for X in setting OS Minor Version in 'subscription-manager release --set 8.X'
+: "${MINOROSVERSION:=""}" # Default if not defined
+
+if [[ "$MINOROSVERSION" != "" ]] && [[ "$OSTYPE" = "RHEL" ]]; then
+
+  SETVERSION= "subscription-manager release --set $MAJOROSVERSION.$MINOROSVERSION"
+
+fi
+
 ##############################
 ## File serialization : WIP ##
 ##############################
@@ -1095,6 +1105,9 @@ sed -i "s/true/false/" /etc/modprobe.d/tipc.conf
 sed -i "s/true/false/" /etc/modprobe.d/sctp.conf
 # Set value to meet stig
 sed -i "s/StopIdleSessionSec=300/StopIdleSessionSec=900/" /etc/systemd/logind.conf
+
+##Prevent OS version upgrading and hard set to value below
+$SETVERSION
 
 # Rebuild the initramfs
 dracut -f

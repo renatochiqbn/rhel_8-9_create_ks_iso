@@ -44,9 +44,10 @@ WRITEPASSWDS="true"
 # NOT Recommended to write plaintext passwords out.
 #password=""
 
+
+##OS Type version
 # Set default OS. (Options: "RHEL" or "CentOS")
 OSTYPE="RHEL" 
-
 #RHEL OS major version. (Options: "8" or "9")
 MAJOROSVERSION="8"
 #RHEL OS major version. (Options: "See RHEL web for minor versions. Default is 9")
