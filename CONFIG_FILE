@@ -49,6 +49,8 @@ OSTYPE="RHEL"
 
 #RHEL OS major version. (Options: "8" or "9")
 MAJOROSVERSION="8"
+#RHEL OS major version. (Options: "See RHEL web for minor versions. Default is 9")
+MINOROSVERSION="9"
 
 #######################
 # Kickstart Variables #
