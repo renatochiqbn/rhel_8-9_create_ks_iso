@@ -18,15 +18,15 @@ echo -e "$0: Starting at $(date)"
 # ks.cfg command syntax varies between RHEL 8.x and 9.x
 : "${MAJOROSVERSION:=9}" # Default if not defined
 
-# Minor OS Version number
-# Used for X in setting OS Minor Version in 'subscription-manager release --set 8.X'
-: "${MINOROSVERSION:=""}" # Default if not defined
+# # Minor OS Version number
+# # Used for X in setting OS Minor Version in 'subscription-manager release --set 8.X'
+# : "${MINOROSVERSION:=""}" # Default if not defined
 
-if [[ "$MINOROSVERSION" != "" ]] && [[ "$OSTYPE" = "RHEL" ]]; then
+# if [[ -z "$MINOROSVERSION" ]] && [[ "$OSTYPE" = "RHEL" ]]; then
 
-  SETVERSION= "subscription-manager release --set $MAJOROSVERSION.$MINOROSVERSION"
+#   SETVERSION= "subscription-manager release --set $MAJOROSVERSION.$MINOROSVERSION"
 
-fi
+# fi
 
 ##############################
 ## File serialization : WIP ##
@@ -127,6 +127,7 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 : "${WRITEPASSWDS:=false}" # Default if not defined
 
 # Write SSH keys to files
+## Not working ##
 : "${WRITESSHKEYS:=false}" # Default if not defined
 
 ##########################
@@ -865,6 +866,7 @@ VIRTUALIZATIONHYPERVISOR=@virtualization-hypervisor
 VIRTUALIZATIONTOOLS=@virtualization-tools
 LIBVIRT="libvirt"
 VIRTUALIZATIONCLIENT=@virtualization-client
+GSSPROXY="gssproxy"
 fi
 
 cat <<EOF >> "$SRCDIR"/ks.cfg
@@ -881,6 +883,7 @@ $VIRTUALIZATIONPLATFORM
 $VIRTUALIZATIONHYPERVISOR
 $VIRTUALIZATIONTOOLS
 $LIBVIRT
+$GSSPROXY
 # Initial Setup application starts the first time the system is booted, required
 # when firstboot option is set above. 
 # initial-setup # Do not set when 'firstboot --disable'
@@ -925,7 +928,6 @@ perl
 -cockpit
 -cockpit-ws
 -cockpit-system
--gssproxy
 -subscription-manager-cockpit
 -iprutils
 -krb5-server
@@ -1040,14 +1042,14 @@ cat <<EOF >> "$SRCDIR"/ks.cfg
 %post
 # Allow provisioning account to sudo without password for initial 
 # systems configuration. Configure per policy once system is provisioned/deployed.
-# cat >> /etc/sudoers.d/provisioning << EOF_sudoers
+
+cat >> /etc/sudoers.d/provisioning << EOF_sudoers
 # ### Allow these accounts sudo access with no password until system fully deployed ###
 # #$username_01 ALL=(ALL) NOPASSWD: ALL
 # #$username_02 ALL=(ALL) NOPASSWD: ALL
-# #$username_03 ALL=(ALL) NOPASSWD: ALL
-# EOF_sudoers
-# chown root:root /etc/sudoers.d/provisioning
-# chmod 0440 /etc/sudoers.d/provisioning
+EOF_sudoers
+chown root:root /etc/sudoers.d/provisioning
+chmod 0440 /etc/sudoers.d/provisioning
 
 # Modify /etc/issue with provisioning information
 # cat >> /etc/issue << EOF_issue
@@ -1106,8 +1108,8 @@ sed -i "s/true/false/" /etc/modprobe.d/sctp.conf
 # Set value to meet stig
 sed -i "s/StopIdleSessionSec=300/StopIdleSessionSec=900/" /etc/systemd/logind.conf
 
-##Prevent OS version upgrading and hard set to value below
-$SETVERSION
+# ##Prevent OS version upgrading and hard set to value below
+# $SETVERSION
 
 # Rebuild the initramfs
 dracut -f

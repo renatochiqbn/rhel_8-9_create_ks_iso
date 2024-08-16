@@ -10,7 +10,7 @@
 # ISOSRCDIR=""
 
 # OEM Source Media File Name
-OEMSRCISO="Linux-RHEL-8.9-x86_64-dvd.iso"
+OEMSRCISO="rhel-8.10-x86_64-dvd.iso"
 
 # Create new full boot ISO
 CREATEBOOTISO="true"
@@ -39,6 +39,8 @@ ENABLEFIPS="true"
 # NOT Recommended to write plaintext passwords out.
 WRITEPASSWDS="true"
 
+WRITESSHKEYS="false"
+
 # Root password - Specify a password in plain text.
 # Generally uneeded, but useful for console testing.
 # NOT Recommended to write plaintext passwords out.
@@ -50,8 +52,8 @@ WRITEPASSWDS="true"
 OSTYPE="RHEL" 
 #RHEL OS major version. (Options: "8" or "9")
 MAJOROSVERSION="8"
-#RHEL OS major version. (Options: "See RHEL web for minor versions. Default is 9")
-MINOROSVERSION="9"
+# #RHEL OS minor version. (Options: "See RHEL web for minor versions. Default is 9")
+# MINOROSVERSION="9"
 
 #######################
 # Kickstart Variables #
