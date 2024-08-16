@@ -124,6 +124,7 @@ WORKDIR=$SCRATCHDIR/$WORKDIRNAME
 ###################################
 
 # Write plaintext passwords to files
+## Not working ##
 : "${WRITEPASSWDS:=false}" # Default if not defined
 
 # Write SSH keys to files
