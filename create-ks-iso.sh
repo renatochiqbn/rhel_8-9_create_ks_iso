@@ -1108,6 +1108,8 @@ sed -i "s/true/false/" /etc/modprobe.d/tipc.conf
 sed -i "s/true/false/" /etc/modprobe.d/sctp.conf
 # Set value to meet stig
 sed -i "s/StopIdleSessionSec=300/StopIdleSessionSec=900/" /etc/systemd/logind.conf
+# Grub2 password misflag - V-230235
+ln -s /boot/efi/EFI/redhat/user.cfg /boot/grub2/user.cfg
 
 # ##Prevent OS version upgrading and hard set to value below
 # $SETVERSION
