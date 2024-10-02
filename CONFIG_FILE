@@ -60,7 +60,7 @@ MAJOROSVERSION="8"
 #######################
 
 # Service admin account for ansible
-username_01="csansible"
+username_01="csansi"
 #username_01_gecos:=Ansible Service Account
 #password_username_03='changeme'
 
@@ -79,9 +79,10 @@ ENABLELUKS="true"
 
 ## Offline Repo changes.
 # Enable offline repo
-ISOFFLINEREPO="false" #Default if not defined
-# Offline repo location
-OFFLINEREPO='http://repo8/configs/offline_redhat8.repo' #Default if not defined
+ISOFFLINEREPO="false" # Default is "false"
+
+## Offline repo location
+# OFFLINEREPO='http://repo8/configs/offline_redhat8.repo' #Default if not defined
 
 # NOTE: Timezone names are sourced from the python pytz.all_timezones list
 TIMEZONE="Etc/UTC"
@@ -91,17 +92,22 @@ NTP_SERVERS=""
 
 ## Logical volume sizes. NO COMMAS!!!
 # / filesystem logical volume size
-LOGVOLSIZEROOT="40960"
+#LOGVOLSIZEROOT="40960"
+LOGVOLSIZEROOT="51200"
 # /home filesystem logical volume size
-LOGVOLSIZEHOME="18332"
+#LOGVOLSIZEHOME="18332"
+LOGVOLSIZEHOME="40960"
 
 # Applies DISA-STIG for RHEL8/9. See https://static.open-scap.org/ssg-guides/ssg-rhel8-guide-stig.html or https://static.open-scap.org/ssg-guides/ssg-rhel9-guide-stig.html
 APPLYOPENSCAPSTIG="true"
 
-# Enable to set virtualization options. Only enable on bare metal installs. Not tested in VM environments.
-ISVIRTUALPLATFORM="true"
-PCIPASSTHROUGH="true"
-INTELCPU="true"
+## Enable to set virtualization options on the VM. !!Only enable on bare metal installs.!! Not tested in VM environments.
+# ISVIRTUALPLATFORM="true"
+# PCIPASSTHROUGH="true"
+# INTELCPU="true"
+ISVIRTUALPLATFORM="false" # Default is "false"
+PCIPASSTHROUGH="false" # Default is "false"
+INTELCPU="false" # Default is "false"
 
 # Enable serial console display
-SERIALDISPLAY="true"
+SERIALDISPLAY="true" # Default is "false"
