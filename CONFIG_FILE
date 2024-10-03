@@ -12,6 +12,10 @@
 # OEM Source Media File Name
 OEMSRCISO="rhel-8.10-x86_64-dvd.iso"
 
+# Kickstart file location passed to bootloader when KSINBOOTISO is set
+# Default is on the ISO file, but could be a network location
+KSLOCATION="hd:LABEL=RHEL-8-10-0-BaseOS-x86_64:\/ks.cfg"
+
 # Create new full boot ISO
 CREATEBOOTISO="true"
 
@@ -23,10 +27,6 @@ KSINBOOTISO="true"
 # Randomly generate a string for serialization
 # Combine suffixes with date in YYYY-MM-DD format
 ADDSUFFIX="true"
-
-# Kickstart file location passed to bootloader when KSINBOOTISO is set
-# Default is on the ISO file, but could be a network location
-KSLOCATION="hd:LABEL=RHEL-8-9-0-BaseOS-x86_64:\/ks.cfg"
 
 # Create OEMDRV volume ISO
 #CREATEOEMDRVISO="true"
@@ -59,6 +59,9 @@ MAJOROSVERSION="8"
 # Kickstart Variables #
 #######################
 
+#Enable for debug. Not required for use.
+DEBUG = "true"
+
 # Service admin account for ansible
 username_01="csansi"
 #username_01_gecos:=Ansible Service Account
@@ -75,11 +78,11 @@ username_03_gecos="Regular Admin Account"
 password_username_03='changeme'
 
 ## Enable drive encryption by LUKS
-ENABLELUKS="true"
+ENABLELUKS="false" # Default is "true"
 
 ## Offline Repo changes.
 # Enable offline repo
-ISOFFLINEREPO="false" # Default is "false"
+ISOFFLINEREPO="true" # Default is "false"
 
 ## Offline repo location
 # OFFLINEREPO='http://repo8/configs/offline_redhat8.repo' #Default if not defined
@@ -92,11 +95,11 @@ NTP_SERVERS=""
 
 ## Logical volume sizes. NO COMMAS!!!
 # / filesystem logical volume size
-#LOGVOLSIZEROOT="40960"
-LOGVOLSIZEROOT="51200"
+LOGVOLSIZEROOT="40960"
+#LOGVOLSIZEROOT="51200"
 # /home filesystem logical volume size
-#LOGVOLSIZEHOME="18332"
-LOGVOLSIZEHOME="40960"
+LOGVOLSIZEHOME="18332"
+#LOGVOLSIZEHOME="40960"
 
 # Applies DISA-STIG for RHEL8/9. See https://static.open-scap.org/ssg-guides/ssg-rhel8-guide-stig.html or https://static.open-scap.org/ssg-guides/ssg-rhel9-guide-stig.html
 APPLYOPENSCAPSTIG="true"
@@ -110,4 +113,4 @@ PCIPASSTHROUGH="false" # Default is "false"
 INTELCPU="false" # Default is "false"
 
 # Enable serial console display
-SERIALDISPLAY="true" # Default is "false"
+SERIALDISPLAY="false" # Default is "false"

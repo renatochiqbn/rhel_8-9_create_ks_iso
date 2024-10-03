@@ -973,7 +973,7 @@ curl http://repo8/configs/offline_redhat8.repo --output /etc/yum.repos.d/offline
 # apply software updates
 yum -y update
 # remove Redhat default repos
-#rm -rf /etc/yum.repos.d/redhat.rep
+#rm -rf /etc/yum.repos.d/redhat.repo
 yum clean all
 %end
 EOF
