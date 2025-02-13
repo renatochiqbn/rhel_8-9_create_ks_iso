@@ -28,6 +28,22 @@ echo -e "$0: Starting at $(date)"
 
 # fi
 
+# Get settings file if available
+SETTINGS_FILE=$(cat .selected_settings)
+
+if [ ! -f "$SETTINGS_FILE" ]; then
+    echo "Settings file not found! Using default settings"
+fi
+
+# Source the settings file
+# Source files for implantation into new ISO (ks.cfg, etc.)
+# This needs to be an absolute path, not a relative path.
+# Also serves as the base for all relative paths defined below.
+SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
+
+# Source CONFIG_FILE for variables
+. "$SRCDIR"/"$SETTINGS_FILE"
+
 ##############################
 ## File serialization : WIP ##
 ##############################
@@ -45,14 +61,6 @@ fi
 ############################
 ## ISO Creation Variables ##
 ############################
-
-# Source files for implantation into new ISO (ks.cfg, etc.)
-# This needs to be an absolute path, not a relative path.
-# Also serves as the base for all relative paths defined below.
-SRCDIR="${SRCDIR:=${PWD}}" # Default is pwd
-
-# Source CONFIG_FILE for variables
-. "$SRCDIR"/CONFIG_FILE
 
 # Output directory name
 : "${OUTPUTDIR:=$SRCDIR/result}" # Default if not defined

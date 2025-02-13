@@ -4,6 +4,8 @@
 temp_file=$(mktemp)
 : "${output_file:="settings.conf"}"
 
+# if [ -f "$VARIABLES_FILE" ]; then
+#     source "$VARIABLES_FILE"
 
 # Initialize values from environment variables or set defaults
 name="${DEFAULT_NAME:-}"
