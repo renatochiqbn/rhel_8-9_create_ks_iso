@@ -37,12 +37,12 @@ select_media() {
         # Store menu selection in TEMP_FILE
         exec 3>&1
         choice=$(dialog --clear --title "Configuration Menu" \
-                       --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                       --menu "Please select an option:" $HEIGHT 200 5 \
                        1 "Enter Working Directory [$SRCDIR]" \
                        2 "Enter ISO Source Directory [$ISOSRCDIR]" \
                        3 "Enter OEM Source ISO Filename [$OEMSRCISO]" \
                        4 "Enter Kickstart Location [$KSLOCATION]" \
-                       5 "Save and Exit" \
+                       5 "Save and Continue" \
                        2>&1 1>&3)
         ret=$?
         exec 3>&-
@@ -124,9 +124,10 @@ select_media() {
                 ;;
             5)
                 # Save settings and exit
-                save_settings "$settings_file" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION"
+                printf "SRCDIR=\"%s\"\nISOSRCDIR=\"%s\"\nOEMSRCISO=\"%s\"\nKSLOCATION=\"%s\"\n" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION" >$TEMP_FILE
                 clear
                 break
+                # return 0 # Success
                 ;;
             *)
                 dialog --title "Error" --msgbox "Invalid choice" 8 40
@@ -134,36 +135,23 @@ select_media() {
                 ;;
         esac
     done
-    
-    # Store values in global variables
-    DEFAULT_SRCDIR="$SRCDIR"
-    DEFAULT_ISOSRCDIR="$ISOSRCDIR"
-    DEFAULT_OEMSRCISO="$OEMSRCISO"
-    DEFAULT_KSLOCATION="$KSLOCATION"
-    
-    # Echo the values for debugging or capture
-    printf "SRCDIR=%s\n" "$SRCDIR"
-    printf "ISOSRCDIR=%s\n" "$ISOSRCDIR"
-    printf "OEMSRCISO=%s\n" "$OEMSRCISO"
-    printf "KSLOCATION=%s\n" "$KSLOCATION"
-    
     return 0
 }
 
-# Placeholder for save_settings function (you must implement this)
-save_settings() {
-  local settings_file="$1"
-  local SRCDIR="$2"
-  local ISOSRCDIR="$3"
-  local OEMSRCISO="$4"
-  local KSLOCATION="$5"
+# # Placeholder for save_settings function 
+# save_settings() {
+#   local settings_file="$1"
+#   local SRCDIR="$2"
+#   local ISOSRCDIR="$3"
+#   local OEMSRCISO="$4"
+#   local KSLOCATION="$5"
 
-  # Implementation to save settings to the file
-  # Example (using printf to format and redirecting to the file):
-  printf "DEFAULT_SRCDIR=\"%s\"\nDEFAULT_ISOSRCDIR=\"%s\"\nDEFAULT_OEMSRCISO=\"%s\"\nDEFAULT_KSLOCATION=\"%s\"\n" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION" >> "$settings_file"
+#   # Implementation to save settings to the file
+#   # Example (using printf to format and redirecting to the file):
+#   printf "DEFAULT_SRCDIR=\"%s\"\nDEFAULT_ISOSRCDIR=\"%s\"\nDEFAULT_OEMSRCISO=\"%s\"\nDEFAULT_KSLOCATION=\"%s\"\n" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION" >> "$settings_file"
 
-  echo "Settings saved to $settings_file"
-}
+#   echo "Settings saved to $settings_file"
+# }
 
 # Function to create or adjust security settings.
 manage_security_settings() {
@@ -276,10 +264,8 @@ create_new_settings() {
     
     # Process Media Select options
     for opt in $media_options; do
-        opt=$(echo $opt | tr -d '"')
         echo "${opt}" >> $SETTINGS_FILE  #not sure what output will be
     done
-
 
     # Process options
     for opt in $OPTIONS; do
@@ -367,6 +353,11 @@ edit_settings() {
         echo "SERIALDISPLAY=false" >> "$temp_settings"
         echo "DEBUG=false" >> "$temp_settings"
         
+        # Select media processing
+        for opt in $media_options; do
+            echo "${opt}" >> $temp_settings
+        done
+
         # Set selected options to true
         for opt in $security_options; do
             opt=$(echo $opt | tr -d '"')
