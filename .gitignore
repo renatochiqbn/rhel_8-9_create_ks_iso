@@ -1,3 +1,4 @@
 result/*
 .selected_settings
-.selected_settings
+testing/.selected_settings
+testing/*.conf
