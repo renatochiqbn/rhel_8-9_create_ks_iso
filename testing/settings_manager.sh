@@ -39,7 +39,7 @@ select_media() {
         choice=$(dialog --clear --title "Configuration Menu" \
                        --menu "Please select an option:" $HEIGHT 200 5 \
                        1 "Enter Working Directory [$SRCDIR]" \
-                       2 "Enter ISO Source Directory [$ISOSRCDIR]" \
+                       2 "Enter ISO Source Directory [...${ISOSRCDIR: -11}]" \
                        3 "Enter OEM Source ISO Filename [$OEMSRCISO]" \
                        4 "Enter Kickstart Location [$KSLOCATION]" \
                        5 "Save and Continue" \
