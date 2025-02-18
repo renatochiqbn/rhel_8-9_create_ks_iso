@@ -138,21 +138,6 @@ select_media() {
     return 0
 }
 
-# # Placeholder for save_settings function 
-# save_settings() {
-#   local settings_file="$1"
-#   local SRCDIR="$2"
-#   local ISOSRCDIR="$3"
-#   local OEMSRCISO="$4"
-#   local KSLOCATION="$5"
-
-#   # Implementation to save settings to the file
-#   # Example (using printf to format and redirecting to the file):
-#   printf "DEFAULT_SRCDIR=\"%s\"\nDEFAULT_ISOSRCDIR=\"%s\"\nDEFAULT_OEMSRCISO=\"%s\"\nDEFAULT_KSLOCATION=\"%s\"\n" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION" >> "$settings_file"
-
-#   echo "Settings saved to $settings_file"
-# }
-
 # Function to create or adjust security settings.
 manage_security_settings() {
     local settings_file=$1
