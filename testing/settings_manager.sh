@@ -13,6 +13,87 @@ TEMP_FILE=$(mktemp)
 HEIGHT=15
 WIDTH=100
 
+# Function for Media Selection
+select_media() {
+    local settings_file="$1"
+
+    source "$settings_file"
+    
+    # Initialize values from environment variables or set defaults
+    local SRCDIR="${DEFAULT_SRCDIR:-${PWD}}"
+    local ISOSRCDIR="${DEFAULT_ISOSRCDIR:-"$SRCDIR/ISO"}"
+    local OEMSRCISO="${DEFAULT_OEMSRCISO:-"rhel-8.10-x86_64-dvd.iso"}"
+    local KSLOCATION="${DEFAULT_KSLOCATION:-"hd:LABEL=RHEL-8-10-0-BaseOS-x86_64:/ks.cfg"}"
+
+    show_main_menu() {
+        local choice  # Make choice local to the menu function ## I think this wont pass values to outer function!
+        choice=$(dialog --clear --title "Configuration Menu" \
+                       --menu "Please select an option:" 15 50 5 \
+                       1 "Enter Source Directory [$SRCDIR]" \
+                       2 "Enter ISO Source Directory [$ISOSRCDIR]" \
+                       3 "Enter OEM Source ISO Filename [$OEMSRCISO]" \
+                       4 "Enter Kickstart Location [$KSLOCATION]" \
+                       5 "Save and Exit" 2>$TEMP_FILE) # Redirect stderr and stdout correctly
+
+        case "$choice" in
+            1)
+                SRCDIR=$(dialog --clear --title "Source Directory" --inputbox "Enter Source Directory:" 8 60 "$SRCDIR" 2>&1 >/dev/tty)
+                if [[ $? -eq 1 ]]; then echo "Cancelled."; return 1; fi # Handle Cancel
+                ;;
+            2)
+                ISOSRCDIR=$(dialog --clear --title "ISO Source Directory" --inputbox "Enter ISO Source Directory:" 8 60 "$ISOSRCDIR" 2>&1 >/dev/tty)
+                if [[ $? -eq 1 ]]; then echo "Cancelled."; return 1; fi
+                ;;
+            3)
+                OEMSRCISO=$(dialog --clear --title "OEM Source ISO Filename" --inputbox "Enter OEM Source ISO Filename:" 8 60 "$OEMSRCISO" 2>&1 >/dev/tty)
+                if [[ $? -eq 1 ]]; then echo "Cancelled."; return 1; fi
+                ;;
+            4)
+                KSLOCATION=$(dialog --clear --title "Kickstart Location" --inputbox "Enter Kickstart Location:" 8 60 "$KSLOCATION" 2>&1 >/dev/tty)
+                if [[ $? -eq 1 ]]; then echo "Cancelled."; return 1; fi
+                ;;
+            5)
+                # Save settings (implementation needed)
+                save_settings "$settings_file" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION"
+                return 0 # Indicate success
+                ;;
+            *)
+                echo "Invalid choice."
+                return 1
+                ;;
+        esac
+
+        return 0 # Indicate success
+    }
+
+    while true; do
+        if ! show_main_menu; then # If show_main_menu fails
+            break # Exit the loop (e.g., user cancelled the menu)
+        fi
+    done
+
+    echo "SRCDIR: $SRCDIR"
+    echo "ISOSRCDIR: $ISOSRCDIR"
+    echo "OEMSRCISO: $OEMSRCISO"
+    echo "KSLOCATION: $KSLOCATION"
+
+}
+
+# Placeholder for save_settings function (you must implement this)
+save_settings() {
+  local settings_file="$1"
+  local SRCDIR="$2"
+  local ISOSRCDIR="$3"
+  local OEMSRCISO="$4"
+  local KSLOCATION="$5"
+
+  # Implementation to save settings to the file
+  # Example (using printf to format and redirecting to the file):
+  printf "DEFAULT_SRCDIR=\"%s\"\nDEFAULT_ISOSRCDIR=\"%s\"\nDEFAULT_OEMSRCISO=\"%s\"\nDEFAULT_KSLOCATION=\"%s\"\n" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION" > "$settings_file"
+
+  echo "Settings saved to $settings_file"
+}
+
 # Function to create or adjust security settings.
 manage_security_settings() {
     local settings_file=$1
