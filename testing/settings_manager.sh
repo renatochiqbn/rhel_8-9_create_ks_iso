@@ -16,67 +16,138 @@ WIDTH=100
 # Function for Media Selection
 select_media() {
     local settings_file="$1"
-
-    source "$settings_file"
+    local SRCDIR=""
+    local ISOSRCDIR=""
+    local OEMSRCISO=""
+    local KSLOCATION=""
     
-    # Initialize values from environment variables or set defaults
-    local SRCDIR="${DEFAULT_SRCDIR:-${PWD}}"
-    local ISOSRCDIR="${DEFAULT_ISOSRCDIR:-"$SRCDIR/ISO"}"
-    local OEMSRCISO="${DEFAULT_OEMSRCISO:-"rhel-8.10-x86_64-dvd.iso"}"
-    local KSLOCATION="${DEFAULT_KSLOCATION:-"hd:LABEL=RHEL-8-10-0-BaseOS-x86_64:/ks.cfg"}"
-
-    show_main_menu() {
-        local choice  # Make choice local to the menu function ## I think this wont pass values to outer function!
+    # Source existing settings if file exists
+    if [[ -f "$settings_file" ]]; then
+        source "$settings_file"
+    fi
+    
+    # Set defaults if not set from file
+    SRCDIR="${DEFAULT_SRCDIR:-${PWD}}"
+    ISOSRCDIR="${DEFAULT_ISOSRCDIR:-"$SRCDIR/ISO"}"
+    OEMSRCISO="${DEFAULT_OEMSRCISO:-"rhel-8.10-x86_64-dvd.iso"}"
+    KSLOCATION="${DEFAULT_KSLOCATION:-"hd:LABEL=RHEL-8-10-0-BaseOS-x86_64:/ks.cfg"}"
+    
+    local ret=0
+    while true; do
+        # Store menu selection in TEMP_FILE
+        exec 3>&1
         choice=$(dialog --clear --title "Configuration Menu" \
-                       --menu "Please select an option:" 15 50 5 \
-                       1 "Enter Source Directory [$SRCDIR]" \
+                       --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                       1 "Enter Working Directory [$SRCDIR]" \
                        2 "Enter ISO Source Directory [$ISOSRCDIR]" \
                        3 "Enter OEM Source ISO Filename [$OEMSRCISO]" \
                        4 "Enter Kickstart Location [$KSLOCATION]" \
-                       5 "Save and Exit" 2>$TEMP_FILE) # Redirect stderr and stdout correctly
+                       5 "Save and Exit" \
+                       2>&1 1>&3)
+        ret=$?
+        exec 3>&-
 
+        # Check if user pressed Cancel or ESC
+        if [[ $ret -ne 0 ]]; then
+            clear
+            return 1
+        fi
+        
         case "$choice" in
             1)
-                SRCDIR=$(dialog --clear --title "Source Directory" --inputbox "Enter Source Directory:" 8 60 "$SRCDIR" 2>&1 >/dev/tty)
-                if [[ $? -eq 1 ]]; then echo "Cancelled."; return 1; fi # Handle Cancel
+                exec 3>&1
+                new_dir=$(dialog --clear --title "Source Directory" \
+                         --inputbox "Enter Source Directory:" 8 $WIDTH "$SRCDIR" \
+                         2>&1 1>&3)
+                ret=$?
+                exec 3>&-
+                if [[ $ret -eq 0 ]]; then
+                    SRCDIR="$new_dir"
+                fi
                 ;;
             2)
-                ISOSRCDIR=$(dialog --clear --title "ISO Source Directory" --inputbox "Enter ISO Source Directory:" 8 60 "$ISOSRCDIR" 2>&1 >/dev/tty)
-                if [[ $? -eq 1 ]]; then echo "Cancelled."; return 1; fi
+                exec 3>&1
+                new_iso_dir=$(dialog --clear --title "ISO Source Directory" \
+                             --inputbox "Enter ISO Source Directory:" 8 $WIDTH "$ISOSRCDIR" \
+                             2>&1 1>&3)
+                ret=$?
+                exec 3>&-
+                if [[ $ret -eq 0 ]]; then
+                    ISOSRCDIR="$new_iso_dir"
+                fi
                 ;;
             3)
-                OEMSRCISO=$(dialog --clear --title "OEM Source ISO Filename" --inputbox "Enter OEM Source ISO Filename:" 8 60 "$OEMSRCISO" 2>&1 >/dev/tty)
-                if [[ $? -eq 1 ]]; then echo "Cancelled."; return 1; fi
+                # Get list of ISO files from the ISOSRCDIR
+                if [[ -d "$ISOSRCDIR" ]]; then
+                    # Create menu items from ISO files
+                    local iso_files=()
+                    local counter=1
+                    while IFS= read -r file; do
+                        iso_files+=("$counter" "$file")
+                        ((counter++))
+                    done < <(find "$ISOSRCDIR" -maxdepth 1 -type f -name "*.iso" -exec basename {} \;)
+
+                    if [[ ${#iso_files[@]} -eq 0 ]]; then
+                        dialog --title "Warning" \
+                               --msgbox "No ISO files found in $ISOSRCDIR" 8 60
+                        continue
+                    fi
+
+                    # Show menu with ISO files
+                    exec 3>&1
+                    new_iso=$(dialog --clear --title "Select OEM Source ISO" \
+                             --menu "Choose an ISO file:" 15 $WIDTH 6 \
+                             "${iso_files[@]}" \
+                             2>&1 1>&3)
+                    ret=$?
+                    exec 3>&-
+
+                    if [[ $ret -eq 0 ]]; then
+                        # Convert selection number back to filename
+                        OEMSRCISO="${iso_files[$(( (new_iso - 1) * 2 + 1 ))]}"
+                    fi
+                else
+                    dialog --title "Error" \
+                           --msgbox "Directory $ISOSRCDIR does not exist!" 8 60
+                fi
                 ;;
             4)
-                KSLOCATION=$(dialog --clear --title "Kickstart Location" --inputbox "Enter Kickstart Location:" 8 60 "$KSLOCATION" 2>&1 >/dev/tty)
-                if [[ $? -eq 1 ]]; then echo "Cancelled."; return 1; fi
+                exec 3>&1
+                new_ks=$(dialog --clear --title "Kickstart Location" \
+                        --inputbox "Enter Kickstart Location:" 8 $WIDTH "$KSLOCATION" \
+                        2>&1 1>&3)
+                ret=$?
+                exec 3>&-
+                if [[ $ret -eq 0 ]]; then
+                    KSLOCATION="$new_ks"
+                fi
                 ;;
             5)
-                # Save settings (implementation needed)
+                # Save settings and exit
                 save_settings "$settings_file" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION"
-                return 0 # Indicate success
+                clear
+                break
                 ;;
             *)
-                echo "Invalid choice."
-                return 1
+                dialog --title "Error" --msgbox "Invalid choice" 8 40
+                continue
                 ;;
         esac
-
-        return 0 # Indicate success
-    }
-
-    while true; do
-        if ! show_main_menu; then # If show_main_menu fails
-            break # Exit the loop (e.g., user cancelled the menu)
-        fi
     done
-
-    echo "SRCDIR: $SRCDIR"
-    echo "ISOSRCDIR: $ISOSRCDIR"
-    echo "OEMSRCISO: $OEMSRCISO"
-    echo "KSLOCATION: $KSLOCATION"
-
+    
+    # Store values in global variables
+    DEFAULT_SRCDIR="$SRCDIR"
+    DEFAULT_ISOSRCDIR="$ISOSRCDIR"
+    DEFAULT_OEMSRCISO="$OEMSRCISO"
+    DEFAULT_KSLOCATION="$KSLOCATION"
+    
+    # Echo the values for debugging or capture
+    printf "SRCDIR=%s\n" "$SRCDIR"
+    printf "ISOSRCDIR=%s\n" "$ISOSRCDIR"
+    printf "OEMSRCISO=%s\n" "$OEMSRCISO"
+    printf "KSLOCATION=%s\n" "$KSLOCATION"
+    
+    return 0
 }
 
 # Placeholder for save_settings function (you must implement this)
@@ -89,7 +160,7 @@ save_settings() {
 
   # Implementation to save settings to the file
   # Example (using printf to format and redirecting to the file):
-  printf "DEFAULT_SRCDIR=\"%s\"\nDEFAULT_ISOSRCDIR=\"%s\"\nDEFAULT_OEMSRCISO=\"%s\"\nDEFAULT_KSLOCATION=\"%s\"\n" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION" > "$settings_file"
+  printf "DEFAULT_SRCDIR=\"%s\"\nDEFAULT_ISOSRCDIR=\"%s\"\nDEFAULT_OEMSRCISO=\"%s\"\nDEFAULT_KSLOCATION=\"%s\"\n" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION" >> "$settings_file"
 
   echo "Settings saved to $settings_file"
 }
@@ -176,6 +247,10 @@ create_new_settings() {
     #        "BACKUP" "Enable automatic backup" OFF 2>$TEMP_FILE
     
     # OPTIONS=$(cat $TEMP_FILE)
+    
+    # Media Source Configuration Options
+    select_media
+    local media_options=$(cat $TEMP_FILE)
 
     # Create Security options
     manage_security_settings
@@ -199,6 +274,13 @@ create_new_settings() {
     echo "PROJECT_NAME='$PROJECT_NAME'" > $SETTINGS_FILE
     echo "OUTPUT_DIR='$OUTPUT_DIR'" >> $SETTINGS_FILE
     
+    # Process Media Select options
+    for opt in $media_options; do
+        opt=$(echo $opt | tr -d '"')
+        echo "${opt}" >> $SETTINGS_FILE  #not sure what output will be
+    done
+
+
     # Process options
     for opt in $OPTIONS; do
         opt=$(echo $opt | tr -d '"')
@@ -241,6 +323,10 @@ edit_settings() {
     dialog --title "Edit Output Directory" \
            --inputbox "Current output directory:" $HEIGHT $WIDTH "$OUTPUT_DIR" 2>$TEMP_FILE
     local new_output_dir=$(cat $TEMP_FILE)
+
+    # Media Source Configuration Options
+    select_media "$settings_file"
+    local media_options=$(cat $TEMP_FILE)
 
     # Edit Security Settings - pass both the settings file and temp file
     manage_security_settings "$settings_file"
@@ -400,3 +486,6 @@ while true; do
             ;;
     esac
 done
+
+# Add trap to clean up temp files
+trap 'rm -f "$TEMP_FILE"' EXIT
