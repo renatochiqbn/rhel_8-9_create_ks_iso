@@ -138,6 +138,62 @@ select_media() {
     return 0
 }
 
+# Select OS type
+select_OS() {
+    local settings_file=$1
+    local choice_os=""
+    local choice_os_version=""
+    
+
+    # Source existing settings if file exists
+    if [[ -f "$settings_file" ]]; then
+        source "$settings_file"
+        local ${OSTYPE:=$OSTYPE}
+        local ${MAJOROSVERSION:=$MAJOROSVERSION}
+    else
+        local OSTYPE="None"
+        local MAJOROSVERSION="Selected"
+    fi
+
+    # OS Flavor Selection
+    choice_os=$(dialog --clear --title "Select Linux Distribution" \
+                        --menu "Current OS selected: [$OSTYPE $MAJOROSVERSION]" 10 50 5 \
+                        "RHEL" "Red Hat Enterprise Linux" \
+                        "CentOS" "CentOS Linux" \
+                        2>&1 1>/dev/tty)
+    ret=$?
+    if [[ $ret -ne 0 ]]; then  # Handle Cancel
+      return 1
+    fi
+
+    # Populate Versions based on Flavor (Example)
+    case "$choice_os" in
+        "RHEL")
+            choice_os_version=$(dialog --clear --title "Select RHEL OS version" \
+                          --menu "Choose the OS distribution:" 10 50 5 \
+                          "8" "Red Hat Enterprise Linux 8" \
+                          "9" "Red Hat Enterprise Linux 9" \
+                          2>&1 1>/dev/tty)  # RHEL versions
+            ;;
+        "CentOS")
+            choice_os_version=$(dialog --clear --title "Select CentOS version" \
+                          --menu "Choose the OS distribution:" 10 50 5 \
+                          "8" "CentOS Linux Stream 8" \
+                          "9" "CentOS Linux Stream 9" \
+                          2>&1 1>/dev/tty)
+            ;;
+        *)
+            echo "Invalid OS flavor selected." >&2 # Error to stderr
+            return 1
+            ;;
+    esac
+
+    # Store choices
+    echo "OSTYPE=\"$choice_os\""
+    echo "MAJOROSVERSION=\"$choice_os_version\""
+    return 0
+}
+
 # Function to create or adjust security settings.
 manage_security_settings() {
     local settings_file=$1
@@ -225,6 +281,9 @@ create_new_settings() {
     select_media
     local media_options=$(cat $TEMP_FILE)
 
+    # OS Selection Options
+    local os_selection=$(select_OS)
+
     # Create Security options
     manage_security_settings
     local security_options=$(cat $TEMP_FILE)
@@ -249,6 +308,11 @@ create_new_settings() {
     
     # Process Media Select options
     for opt in $media_options; do
+        echo "${opt}" >> $SETTINGS_FILE  #not sure what output will be
+    done
+
+    # Process OS Selection
+    for opt in $os_selection; do  #Test this!!!!!!!
         echo "${opt}" >> $SETTINGS_FILE  #not sure what output will be
     done
 
@@ -299,6 +363,9 @@ edit_settings() {
     select_media "$settings_file"
     local media_options=$(cat $TEMP_FILE)
 
+    # OS Selection Options
+    local os_selection=$(select_OS "$settings_file")
+
     # Edit Security Settings - pass both the settings file and temp file
     manage_security_settings "$settings_file"
     local security_options=$(cat $TEMP_FILE)
@@ -341,6 +408,11 @@ edit_settings() {
         # Select media processing
         for opt in $media_options; do
             echo "${opt}" >> $temp_settings
+        done
+        
+        # Process OS Selection
+        for opt in $os_selection; do  #Test this!!!!!!!
+            echo "${opt}" >> $temp_settings  #not sure what output will be
         done
 
         # Set selected options to true
