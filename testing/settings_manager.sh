@@ -194,6 +194,205 @@ select_OS() {
     return 0
 }
 
+# Function to manage user settigns
+# Function to manage user settings
+manage_user_settings() {
+    local settings_file=$1
+    local usr01="true"
+  
+    # Source existing settings if file exists
+    if [[ -f "$settings_file" ]]; then
+        source "$settings_file"
+        local username_01="${username_01}"
+        local username_01_gecos="${username_01_gecos}"
+        local password_username_01="${password_username_01}"
+        local username_02="${username_02}"
+        local username_02_gecos="${username_02_gecos}"
+        local password_username_02="${password_username_02}"
+        local username_03="${username_03}"
+        local username_03_gecos="${username_03_gecos}"
+        local password_username_03="${password_username_03}"
+        if [[ -n "$password_username_01" ]]; then isset_pass1="true"; fi
+        if [[ -n "$password_username_02" ]]; then isset_pass2="true"; fi
+        if [[ -n "$password_username_03" ]]; then isset_pass3="true"; fi
+    else
+        # Set defaults if not set from file
+        local username_01="alt.admin"
+        local username_01_gecos="Regular Admin Account"
+        local username_02="acas.admin"
+        local username_02_gecos="Nessus Admin Account"
+        local username_03="ansible.admin"
+        local username_03_gecos="Ansible Service Account"
+        # Passwords start as null
+        local password_username_01=""
+        local password_username_02=""
+        local password_username_03=""
+    fi
+    while true; do
+        choice=$(dialog --clear --title "Configuration Menu" \
+                    --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                    1 "Edit Admin User 1 [$username_01 - $username_01_gecos]" \
+                    2 "Edit Admin User 2 [$username_02 - $username_02_gecos]" \
+                    3 "Edit Admin User 3 [$username_03 - $username_03_gecos]" \
+                    4 "Save and Continue" \
+                    2>&1 >/dev/tty)
+        ret=$?
+
+            # Check if user pressed Cancel or ESC
+            if [[ $ret -ne 0 ]]; then
+                clear
+                return 1
+            fi
+            
+            case "$choice" in
+                1)
+                    while true; do
+                        sub_choice=$(dialog --clear --title "Edit Admin $username_01" \
+                                --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                                1 "Edit Username [$username_01]" \
+                                2 "Edit Account Description [$username_01_gecos]" \
+                                3 "Edit Password [Password set: ${isset_pass1:-no}]" \
+                                4 "Continue" \
+                                2>&1 >/dev/tty)
+                        ret=$?
+
+                        if [[ $ret -eq 0 ]]; then
+                            while true; do
+                                case "$sub_choice" in
+                                    1)
+                                        new_value=$(dialog --clear --inputbox "Enter Username:" 8 $WIDTH "$username_01" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_01="$new_value"
+                                        break
+                                        ;;
+                                    2)
+                                        new_value=$(dialog --clear --inputbox "Enter Account Description:" 8 $WIDTH "$username_01_gecos" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_01_gecos="'$new_value'"
+                                        break
+                                        ;;
+                                    3)
+                                        new_value=$(dialog --clear --passwordbox "Enter Password:" 8 $WIDTH 2>&1 >/dev/tty)
+                                        if [[ $? -eq 0 && -n "$new_value" ]]; then
+                                            password_username_01="'$new_value'"
+                                            isset_pass1="true"
+                                        fi
+                                        break
+                                        ;;
+                                    4)
+                                        clear
+                                        break
+                                        ;;
+                                esac
+                            done
+                        fi
+                        break
+                    done
+                    ;;
+                2)
+                    while true; do
+                        sub_choice=$(dialog --clear --title "Edit Admin $username_02" \
+                                --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                                1 "Edit Username [$username_02]" \
+                                2 "Edit Account Description [$username_02_gecos]" \
+                                3 "Edit Password [Password set: ${isset_pass2:-no}]" \
+                                4 "Continue" \
+                                2>&1 >/dev/tty)
+                        ret=$?
+
+                        if [[ $ret -eq 0 ]]; then
+                            while true; do
+                                case "$sub_choice" in
+                                    1)
+                                        new_value=$(dialog --clear --inputbox "Enter Username:" 8 $WIDTH "$username_02" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_02="$new_value"
+                                        break
+                                        ;;
+                                    2)
+                                        new_value=$(dialog --clear --inputbox "Enter Account Description:" 8 $WIDTH "$username_02_gecos" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_02_gecos="'$new_value'"
+                                        break
+                                        ;;
+                                    3)
+                                        new_value=$(dialog --clear --passwordbox "Enter Password:" 8 $WIDTH 2>&1 >/dev/tty)
+                                        if [[ $? -eq 0 && -n "$new_value" ]]; then
+                                            password_username_02="$new_value"
+                                            isset_pass2="true"
+                                        fi
+                                        break
+                                        ;;
+                                    4)
+                                        clear
+                                        break
+                                        ;;
+                                esac
+                            done
+                        fi
+                        break
+                    done
+                    ;;
+                3)
+                    while true; do
+                        sub_choice=$(dialog --clear --title "Edit Admin $username_03" \
+                                --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                                1 "Edit Username [$username_03]" \
+                                2 "Edit Account Description [$username_03_gecos]" \
+                                3 "Edit Password [Password set: ${isset_pass3:-no}]" \
+                                4 "Continue" \
+                                2>&1 >/dev/tty)
+                        ret=$?
+
+                        if [[ $ret -eq 0 ]]; then
+                            while true; do
+                                case "$sub_choice" in
+                                    1)
+                                        new_value=$(dialog --clear --inputbox "Enter Username:" 8 $WIDTH "$username_03" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_03="$new_value"
+                                        break
+                                        ;;
+                                    2)
+                                        new_value=$(dialog --clear --inputbox "Enter Account Description:" 8 $WIDTH "$username_03_gecos" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_03_gecos="'$new_value'"
+                                        break
+                                        ;;
+                                    3)
+                                        new_value=$(dialog --clear --passwordbox "Enter Password:" 8 $WIDTH 2>&1 >/dev/tty)
+                                        if [[ $? -eq 0 && -n "$new_value" ]]; then
+                                            password_username_03="$new_value"
+                                            isset_pass3="true"
+                                        fi
+                                        break
+                                        ;;
+                                    4)
+                                        clear
+                                        break
+                                        ;;
+                                esac
+                            done
+                        fi
+                        break
+                    done
+                    ;;
+                4)
+                    # Store settings
+                    echo "username_01=\"$username_01\""
+                    echo "username_01_gecos=\"$username_01_gecos\""
+                    [[ -n "$password_username_01" ]] && echo "password_username_01=\"$password_username_01\""
+                    echo "username_02=\"$username_02\""
+                    echo "username_02_gecos=\"$username_02_gecos\""
+                    [[ -n "$password_username_02" ]] && echo "password_username_02=\"$password_username_02\""
+                    echo "username_03=\"$username_03\""
+                    echo "username_03_gecos=\"$username_03_gecos\""
+                    [[ -n "$password_username_03" ]] && echo "password_username_03=\"$password_username_03\""
+                    clear
+                    return 0
+                    ;;
+                *)
+                    dialog --title "Error" --msgbox "Invalid choice" 8 40
+                    continue
+                    ;;
+            esac
+    done
+}
+
 # Function to create or adjust security settings.
 manage_security_settings() {
     local settings_file=$1
@@ -288,11 +487,14 @@ create_new_settings() {
     manage_security_settings
     local security_options=$(cat $TEMP_FILE)
 
-    # Edit Virtualization Settings
+    # Create Virtualization Settings
     manage_virtual_settings
     local virtual_options=$(cat $TEMP_FILE)
+    
+    #Create User Settings
+    local user_selection=$(manage_user_settings)
 
-    # Edit Additional Settings
+    # Create Additional Settings
     manage_additional_settings
     local additional_options=$(cat $TEMP_FILE)
     
@@ -312,8 +514,13 @@ create_new_settings() {
     done
 
     # Process OS Selection
-    for opt in $os_selection; do  #Test this!!!!!!!
-        echo "${opt}" >> $SETTINGS_FILE  #not sure what output will be
+    for opt in $os_selection; do 
+        echo "${opt}" >> $SETTINGS_FILE 
+    done
+
+    # Process User Selection
+    for opt in $user_selection; do 
+        echo "${opt}" >> $SETTINGS_FILE 
     done
 
     # Process options
@@ -373,6 +580,9 @@ edit_settings() {
     # Edit Security Settings - pass both the settings file and temp file
     manage_virtual_settings "$settings_file"
     local virtual_options=$(cat $TEMP_FILE)
+    
+    #Edit User Settings
+    local user_selection=$(manage_user_settings "$settings_file")
 
     # Edit Security Settings - pass both the settings file and temp file
     manage_additional_settings "$settings_file"
@@ -430,7 +640,12 @@ edit_settings() {
             opt=$(echo $opt | tr -d '"')
             sed -i "s/${opt}=false/${opt}=true/" "$temp_settings"
         done
-        
+    
+        # Process User Selection
+        for opt in $user_selection; do 
+            echo "${opt}" >> $temp_settings 
+        done
+
         # Replace original file with new settings
         mv "$temp_settings" "$settings_file"
         
@@ -526,9 +741,11 @@ while true; do
         5)
             rm -f $TEMP_FILE
             if [ -n "$SETTINGS_FILE" ]; then
+                clear
                 echo $SETTINGS_FILE > .selected_settings
                 exit 0
             else
+                clear
                 exit 1
             fi
             ;;
