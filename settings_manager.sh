@@ -13,6 +13,473 @@ TEMP_FILE=$(mktemp)
 HEIGHT=15
 WIDTH=100
 
+# Function for Media Selection
+select_media() {
+    local settings_file="$1"
+    local SRCDIR=""
+    local ISOSRCDIR=""
+    local OEMSRCISO=""
+    local KSLOCATION=""
+    
+    # Source existing settings if file exists
+    if [[ -f "$settings_file" ]]; then
+        source "$settings_file"
+    fi
+    
+    # Set defaults if not set from file
+    SRCDIR="${DEFAULT_SRCDIR:-${PWD}}"
+    ISOSRCDIR="${DEFAULT_ISOSRCDIR:-"$SRCDIR/ISO"}"
+    OEMSRCISO="${DEFAULT_OEMSRCISO:-"rhel-8.10-x86_64-dvd.iso"}"
+    KSLOCATION="${DEFAULT_KSLOCATION:-"hd:LABEL=RHEL-8-10-0-BaseOS-x86_64:/ks.cfg"}"
+    
+    local ret=0
+    while true; do
+        # Store menu selection in TEMP_FILE
+        exec 3>&1
+        choice=$(dialog --clear --title "Configuration Menu" \
+                       --menu "Please select an option:" $HEIGHT 200 5 \
+                       1 "Enter Working Directory [$SRCDIR]" \
+                       2 "Enter ISO Source Directory [...${ISOSRCDIR: -11}]" \
+                       3 "Enter OEM Source ISO Filename [$OEMSRCISO]" \
+                       4 "Enter Kickstart Location [$KSLOCATION]" \
+                       5 "Save and Continue" \
+                       2>&1 1>&3)
+        ret=$?
+        exec 3>&-
+
+        # Check if user pressed Cancel or ESC
+        if [[ $ret -ne 0 ]]; then
+            clear
+            return 1
+        fi
+        
+        case "$choice" in
+            1)
+                exec 3>&1
+                new_dir=$(dialog --clear --title "Source Directory" \
+                         --inputbox "Enter Source Directory:" 8 $WIDTH "$SRCDIR" \
+                         2>&1 1>&3)
+                ret=$?
+                exec 3>&-
+                if [[ $ret -eq 0 ]]; then
+                    SRCDIR="$new_dir"
+                fi
+                ;;
+            2)
+                exec 3>&1
+                new_iso_dir=$(dialog --clear --title "ISO Source Directory" \
+                             --inputbox "Enter ISO Source Directory:" 8 $WIDTH "$ISOSRCDIR" \
+                             2>&1 1>&3)
+                ret=$?
+                exec 3>&-
+                if [[ $ret -eq 0 ]]; then
+                    ISOSRCDIR="$new_iso_dir"
+                fi
+                ;;
+            3)
+                # Get list of ISO files from the ISOSRCDIR
+                if [[ -d "$ISOSRCDIR" ]]; then
+                    # Create menu items from ISO files
+                    local iso_files=()
+                    local counter=1
+                    while IFS= read -r file; do
+                        iso_files+=("$counter" "$file")
+                        ((counter++))
+                    done < <(find "$ISOSRCDIR" -maxdepth 1 -type f -name "*.iso" -exec basename {} \;)
+
+                    if [[ ${#iso_files[@]} -eq 0 ]]; then
+                        dialog --title "Warning" \
+                               --msgbox "No ISO files found in $ISOSRCDIR" 8 60
+                        continue
+                    fi
+
+                    # Show menu with ISO files
+                    exec 3>&1
+                    new_iso=$(dialog --clear --title "Select OEM Source ISO" \
+                             --menu "Choose an ISO file:" 15 $WIDTH 6 \
+                             "${iso_files[@]}" \
+                             2>&1 1>&3)
+                    ret=$?
+                    exec 3>&-
+
+                    if [[ $ret -eq 0 ]]; then
+                        # Convert selection number back to filename
+                        OEMSRCISO="${iso_files[$(( (new_iso - 1) * 2 + 1 ))]}"
+                    fi
+                else
+                    dialog --title "Error" \
+                           --msgbox "Directory $ISOSRCDIR does not exist!" 8 60
+                fi
+                ;;
+            4)
+                exec 3>&1
+                new_ks=$(dialog --clear --title "Kickstart Location" \
+                        --inputbox "Enter Kickstart Location:" 8 $WIDTH "$KSLOCATION" \
+                        2>&1 1>&3)
+                ret=$?
+                exec 3>&-
+                if [[ $ret -eq 0 ]]; then
+                    KSLOCATION="$new_ks"
+                fi
+                ;;
+            5)
+                # Save settings and exit
+                printf "SRCDIR=\"%s\"\nISOSRCDIR=\"%s\"\nOEMSRCISO=\"%s\"\nKSLOCATION=\"%s\"\n" "$SRCDIR" "$ISOSRCDIR" "$OEMSRCISO" "$KSLOCATION" >$TEMP_FILE
+                clear
+                break
+                # return 0 # Success
+                ;;
+            *)
+                dialog --title "Error" --msgbox "Invalid choice" 8 40
+                continue
+                ;;
+        esac
+    done
+    return 0
+}
+
+# Select OS type
+select_OS() {
+    local settings_file=$1
+    local choice_os=""
+    local choice_os_version=""
+    
+
+    # Source existing settings if file exists
+    if [[ -f "$settings_file" ]]; then
+        source "$settings_file"
+        local ${OSTYPE:=$OSTYPE}
+        local ${MAJOROSVERSION:=$MAJOROSVERSION}
+        local ${ISOFFLINEREPO:=$ISOFFLINEREPO}
+        local ${OFFLINEREPO:=$OFFLINEREPO}
+    else
+        local OSTYPE="RHEL"
+        local MAJOROSVERSION="8"
+        local ISOFFLINEREPO="false"
+        local OFFLINEREPO=""
+    fi
+
+    # OS Flavor Selection
+    while true; do
+        choice_os=$(dialog --clear --title "Select Linux Distribution" \
+                            --menu "Current OS selected: [$OSTYPE $MAJOROSVERSION]" 13 50 5 \
+                            "RHEL" "Red Hat Enterprise Linux" \
+                            "CentOS" "CentOS Linux" \
+                            "Offline_Repo" "Current Repo:${OFFLINEREPO:- none} " \
+                            "Continue" "Save and Continue" \
+                            2>&1 1>/dev/tty)
+        ret=$?
+        if [[ $ret -ne 0 ]]; then  # Handle Cancel
+        return 1
+        fi
+
+        # Populate Versions based on Flavor (Example)
+        while true; do
+            case "$choice_os" in
+                "RHEL")
+                    choice_os_version=$(dialog --clear --title "Select RHEL OS version" \
+                                --menu "Choose the OS distribution:" 10 50 5 \
+                                "8" "Red Hat Enterprise Linux 8" \
+                                "9" "Red Hat Enterprise Linux 9" \
+                                2>&1 1>/dev/tty)  # RHEL versions
+                    OSTYPE="RHEL"
+                    MAJOROSVERSION="$choice_os_version"
+                    break
+                    ;;
+                "CentOS")
+                    choice_os_version=$(dialog --clear --title "Select CentOS version" \
+                                --menu "Choose the OS distribution:" 10 50 5 \
+                                "8" "CentOS Linux Stream 8" \
+                                "9" "CentOS Linux Stream 9" \
+                                2>&1 1>/dev/tty) # CentOS versions
+                    OSTYPE="CentOS"
+                    MAJOROSVERSION="$choice_os_version"
+                    break
+                    ;;
+                "Offline_Repo")
+                        OFFLINEREPO=$(dialog --clear --inputbox \
+                        "Enter offline repo server address. (ex: https://repo.mil/offline):" 8 $WIDTH "$OFFLINEREPO" \
+                        2>&1 >/dev/tty)
+                    break
+                    ;;
+                "Continue")    
+                    echo "OSTYPE=\"$OSTYPE\""
+                    echo "MAJOROSVERSION=\"$MAJOROSVERSION\""
+                    [[ -n "$OFFLINEREPO" ]] && echo "ISOFFLINEREPO=\"true\""
+                    [[ -n "$OFFLINEREPO" ]] && echo "OFFLINEREPO=\"$OFFLINEREPO\""
+                    return 0
+                    ;;
+                *)
+                    echo "Invalid OS flavor selected." >&2 # Error to stderr
+                    return 1
+                    ;;
+            esac
+        done
+    done
+    # # Store choices
+    # echo "OSTYPE=\"$choice_os\""
+    # echo "MAJOROSVERSION=\"$choice_os_version\""
+    # echo "ISOFFLINEREPO=\"$ISOFFLINEREPO\""
+    # [[ -n "$OFFLINEREPO" ]] && echo "OFFLINEREPO=\"$OFFLINEREPO\""
+    # return 0
+}
+
+# Function to manage user settigns
+manage_time_settings() {
+    local settings_file=$1
+    
+
+    # Source existing settings if file exists
+    if [[ -f "$settings_file" ]]; then
+        source "$settings_file"
+        local ${TIMEZONE:=$TIMEZONE}
+        if [[-n "$NTP_SERVERS"]]; then
+            local ${NTP_SERVERS:-$NTP_SERVERS}
+            # IFS=',' read -ra NTP_SERVERS <<< "$NTP_SERVERS" ##if items need to be stored in an array for processing
+        fi
+    else
+        local TIMEZONE="Etc/UTC"
+        local NTP_SERVERS=""
+    fi
+
+    while true; do
+        sub_choice=$(dialog --clear --title "Edit Time Settings" \
+                --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                1 "Edit Timezone [$TIMEZONE]" \
+                2 "Edit NTP Servers [Current: ${NTP_SERVERS:-none}]" \
+                3 "Continue" \
+                2>&1 >/dev/tty)
+        ret=$?
+
+        # Check if user pressed Cancel or ESC
+        if [[ $ret -ne 0 ]]; then
+            clear
+            return 1
+        fi
+            
+        if [[ $ret -eq 0 ]]; then
+            while true; do
+                case "$sub_choice" in
+                    1)
+                        new_value=$(dialog --clear --inputbox "Enter Timezone:" 8 $WIDTH "$TIMEZONE" 2>&1 >/dev/tty)
+                        [[ $? -eq 0 ]] && TIMEZONE="$new_value"
+                        break
+                        ;;
+                    2)
+                        new_value=$(dialog --clear --inputbox "Enter NTP SERVERS. Comma delimited:" 8 $WIDTH "$NTP_SERVERS" 2>&1 >/dev/tty)
+                        [[ $? -eq 0 ]] && NTP_SERVERS="'${new_value// /}'"
+                        break
+                        ;;
+                    3)
+                        printf "%s\n" "TIMEZONE=\"$TIMEZONE\""
+                        [[ -n "$NTP_SERVERS" ]] && printf "%s\n" "NTP_SERVERS=\"$NTP_SERVERS\""
+                        return 0
+                        ;;
+                esac
+            done
+        fi
+    done
+
+}
+
+# Function to manage user settings
+manage_user_settings() {
+    local settings_file=$1
+    local usr01="true"
+  
+    # Source existing settings if file exists
+    if [[ -f "$settings_file" ]]; then
+        source "$settings_file"
+        local username_01="${username_01}"
+        local username_01_gecos="${username_01_gecos}"
+        local password_username_01="${password_username_01}"
+        local username_02="${username_02}"
+        local username_02_gecos="${username_02_gecos}"
+        local password_username_02="${password_username_02}"
+        local username_03="${username_03}"
+        local username_03_gecos="${username_03_gecos}"
+        local password_username_03="${password_username_03}"
+        if [[ -n "$password_username_01" ]]; then isset_pass1="true"; fi
+        if [[ -n "$password_username_02" ]]; then isset_pass2="true"; fi
+        if [[ -n "$password_username_03" ]]; then isset_pass3="true"; fi
+    else
+        # Set defaults if not set from file
+        local username_01="alt.admin"
+        local username_01_gecos="Regular Admin Account"
+        local username_02="acas.admin"
+        local username_02_gecos="Nessus Admin Account"
+        local username_03="ansible.admin"
+        local username_03_gecos="Ansible Service Account"
+        # Passwords start as null
+        local password_username_01=""
+        local password_username_02=""
+        local password_username_03=""
+    fi
+    while true; do
+        choice=$(dialog --clear --title "Configuration Menu" \
+                    --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                    1 "Edit Admin User 1 [$username_01 - $username_01_gecos]" \
+                    2 "Edit Admin User 2 [$username_02 - $username_02_gecos]" \
+                    3 "Edit Admin User 3 [$username_03 - $username_03_gecos]" \
+                    4 "Save and Continue" \
+                    2>&1 >/dev/tty)
+        ret=$?
+
+            # Check if user pressed Cancel or ESC
+            if [[ $ret -ne 0 ]]; then
+                clear
+                return 1
+            fi
+            
+            case "$choice" in
+                1)
+                    while true; do
+                        sub_choice=$(dialog --clear --title "Edit Admin $username_01" \
+                                --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                                1 "Edit Username [$username_01]" \
+                                2 "Edit Account Description [$username_01_gecos]" \
+                                3 "Edit Password [Password set: ${isset_pass1:-no}]" \
+                                4 "Continue" \
+                                2>&1 >/dev/tty)
+                        ret=$?
+
+                        if [[ $ret -eq 0 ]]; then
+                            while true; do
+                                case "$sub_choice" in
+                                    1)
+                                        new_value=$(dialog --clear --inputbox "Enter Username:" 8 $WIDTH "$username_01" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_01="$new_value"
+                                        break
+                                        ;;
+                                    2)
+                                        new_value=$(dialog --clear --inputbox "Enter Account Description:" 8 $WIDTH "$username_01_gecos" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_01_gecos="'$new_value'"
+                                        break
+                                        ;;
+                                    3)
+                                        new_value=$(dialog --clear --passwordbox "Enter Password:" 8 $WIDTH 2>&1 >/dev/tty)
+                                        if [[ $? -eq 0 && -n "$new_value" ]]; then
+                                            password_username_01="'$new_value'"
+                                            isset_pass1="true"
+                                        fi
+                                        break
+                                        ;;
+                                    4)
+                                        clear
+                                        break
+                                        ;;
+                                esac
+                            done
+                        fi
+                        break
+                    done
+                    ;;
+                2)
+                    while true; do
+                        sub_choice=$(dialog --clear --title "Edit Admin $username_02" \
+                                --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                                1 "Edit Username [$username_02]" \
+                                2 "Edit Account Description [$username_02_gecos]" \
+                                3 "Edit Password [Password set: ${isset_pass2:-no}]" \
+                                4 "Continue" \
+                                2>&1 >/dev/tty)
+                        ret=$?
+
+                        if [[ $ret -eq 0 ]]; then
+                            while true; do
+                                case "$sub_choice" in
+                                    1)
+                                        new_value=$(dialog --clear --inputbox "Enter Username:" 8 $WIDTH "$username_02" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_02="$new_value"
+                                        break
+                                        ;;
+                                    2)
+                                        new_value=$(dialog --clear --inputbox "Enter Account Description:" 8 $WIDTH "$username_02_gecos" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_02_gecos="'$new_value'"
+                                        break
+                                        ;;
+                                    3)
+                                        new_value=$(dialog --clear --passwordbox "Enter Password:" 8 $WIDTH 2>&1 >/dev/tty)
+                                        if [[ $? -eq 0 && -n "$new_value" ]]; then
+                                            password_username_02="$new_value"
+                                            isset_pass2="true"
+                                        fi
+                                        break
+                                        ;;
+                                    4)
+                                        clear
+                                        break
+                                        ;;
+                                esac
+                            done
+                        fi
+                        break
+                    done
+                    ;;
+                3)
+                    while true; do
+                        sub_choice=$(dialog --clear --title "Edit Admin $username_03" \
+                                --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                                1 "Edit Username [$username_03]" \
+                                2 "Edit Account Description [$username_03_gecos]" \
+                                3 "Edit Password [Password set: ${isset_pass3:-no}]" \
+                                4 "Continue" \
+                                2>&1 >/dev/tty)
+                        ret=$?
+
+                        if [[ $ret -eq 0 ]]; then
+                            while true; do
+                                case "$sub_choice" in
+                                    1)
+                                        new_value=$(dialog --clear --inputbox "Enter Username:" 8 $WIDTH "$username_03" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_03="$new_value"
+                                        break
+                                        ;;
+                                    2)
+                                        new_value=$(dialog --clear --inputbox "Enter Account Description:" 8 $WIDTH "$username_03_gecos" 2>&1 >/dev/tty)
+                                        [[ $? -eq 0 ]] && username_03_gecos="'$new_value'"
+                                        break
+                                        ;;
+                                    3)
+                                        new_value=$(dialog --clear --passwordbox "Enter Password:" 8 $WIDTH 2>&1 >/dev/tty)
+                                        if [[ $? -eq 0 && -n "$new_value" ]]; then
+                                            password_username_03="$new_value"
+                                            isset_pass3="true"
+                                        fi
+                                        break
+                                        ;;
+                                    4)
+                                        clear
+                                        break
+                                        ;;
+                                esac
+                            done
+                        fi
+                        break
+                    done
+                    ;;
+                4)
+                    # Store settings
+                    # ■ ▼
+                    printf "%s\n" "username_01=\"$username_01\""
+                    username_01_gecos="${username_01_gecos// /■}" && printf "username_01_gecos=\"%s\"\n" "$username_01_gecos"
+                    [[ -n "$password_username_01" ]] && password_username_01="${password_username_01// /■}" && printf "%s\n" "password_username_01=\"$password_username_01\""
+                    printf "%s\n" "username_02=\"$username_02\""
+                    username_02_gecos="${username_02_gecos// /■}" && printf "%s\n" "username_02_gecos=\"$username_02_gecos\""
+                    [[ -n "$password_username_02" ]] && password_username_02="${password_username_02// /■}" && printf "%s\n" "password_username_02=\"$password_username_02\""
+                    printf "%s\n" "username_03=\"$username_03\""
+                    username_03_gecos="${username_03_gecos// /■}" && printf "%s\n" "username_03_gecos=\"$username_03_gecos\""
+                    [[ -n "$password_username_03" ]] && password_username_03="${password_username_03// /■}" && printf "%s\n" "password_username_03=\"$password_username_03\""
+                    return 0
+                    ;;
+                *)
+                    dialog --title "Error" --msgbox "Invalid choice" 8 40
+                    continue
+                    ;;
+            esac
+    done
+}
+
 # Function to create or adjust security settings.
 manage_security_settings() {
     local settings_file=$1
@@ -95,16 +562,29 @@ create_new_settings() {
     #        "BACKUP" "Enable automatic backup" OFF 2>$TEMP_FILE
     
     # OPTIONS=$(cat $TEMP_FILE)
+    
+    # Media Source Configuration Options
+    select_media
+    local media_options=$(cat $TEMP_FILE)
 
+    # OS Selection Options
+    local os_selection=$(select_OS)
+
+    # Create User Settings
+    local user_selection=$(manage_user_settings)
+
+    # Create time settings
+    local time_options=$(manage_time_settings)
+    
     # Create Security options
     manage_security_settings
     local security_options=$(cat $TEMP_FILE)
 
-    # Edit Virtualization Settings
+    # Create Virtualization Settings
     manage_virtual_settings
     local virtual_options=$(cat $TEMP_FILE)
-
-    # Edit Additional Settings
+    
+    # Create Additional Settings
     manage_additional_settings
     local additional_options=$(cat $TEMP_FILE)
     
@@ -118,6 +598,26 @@ create_new_settings() {
     echo "PROJECT_NAME='$PROJECT_NAME'" > $SETTINGS_FILE
     echo "OUTPUT_DIR='$OUTPUT_DIR'" >> $SETTINGS_FILE
     
+    # Process Media Select options
+    for opt in $media_options; do
+        echo "${opt}" >> $SETTINGS_FILE  #not sure what output will be
+    done
+
+    # Process OS Selection
+    for opt in $os_selection; do 
+        echo "${opt}" >> $SETTINGS_FILE 
+    done
+
+    # Process User Selection
+    for opt in $user_selection; do 
+        echo "${opt//■/ }" >> $SETTINGS_FILE 
+    done
+
+    # Process time settings
+    for opt in $time_options; do 
+        echo "${opt}" >> $SETTINGS_FILE 
+    done
+
     # Process options
     for opt in $OPTIONS; do
         opt=$(echo $opt | tr -d '"')
@@ -161,6 +661,19 @@ edit_settings() {
            --inputbox "Current output directory:" $HEIGHT $WIDTH "$OUTPUT_DIR" 2>$TEMP_FILE
     local new_output_dir=$(cat $TEMP_FILE)
 
+    # Media Source Configuration Options
+    select_media "$settings_file"
+    local media_options=$(cat $TEMP_FILE)
+
+    # OS Selection Options
+    local os_selection=$(select_OS "$settings_file")
+
+    #Edit User Settings
+    local user_selection=$(manage_user_settings "$settings_file")
+
+    # Create time settings
+    local time_options=$(manage_time_settings "$settings_file")
+
     # Edit Security Settings - pass both the settings file and temp file
     manage_security_settings "$settings_file"
     local security_options=$(cat $TEMP_FILE)
@@ -168,7 +681,7 @@ edit_settings() {
     # Edit Security Settings - pass both the settings file and temp file
     manage_virtual_settings "$settings_file"
     local virtual_options=$(cat $TEMP_FILE)
-
+    
     # Edit Security Settings - pass both the settings file and temp file
     manage_additional_settings "$settings_file"
     local additional_options=$(cat $TEMP_FILE)
@@ -200,6 +713,21 @@ edit_settings() {
         echo "SERIALDISPLAY=false" >> "$temp_settings"
         echo "DEBUG=false" >> "$temp_settings"
         
+        # Select media processing
+        for opt in $media_options; do
+            echo "${opt}" >> $temp_settings
+        done
+        
+        # Process OS Selection
+        for opt in $os_selection; do 
+            echo "${opt}" >> $temp_settings 
+        done
+
+        # Process time settings
+        for opt in $time_options; do 
+            echo "${opt}" >> $temp_settings 
+        done
+
         # Set selected options to true
         for opt in $security_options; do
             opt=$(echo $opt | tr -d '"')
@@ -215,7 +743,12 @@ edit_settings() {
             opt=$(echo $opt | tr -d '"')
             sed -i "s/${opt}=false/${opt}=true/" "$temp_settings"
         done
-        
+    
+        # Process User Selection
+        for opt in $user_selection; do 
+            echo "${opt//■/ }" >> $temp_settings 
+        done
+
         # Replace original file with new settings
         mv "$temp_settings" "$settings_file"
         
@@ -236,15 +769,7 @@ review_settings() {
     # Source the settings file
     source "$settings_file"
     
-    # Prepare review text
-    review_text="Current Settings in $settings_file:\n\n"
-    review_text+="Project Name: $PROJECT_NAME\n"
-    review_text+="Output Directory: $OUTPUT_DIR\n\n"
-    review_text+="Options:\n"
-    review_text+="Debug Mode: ${DEBUG:-false}\n"
-    review_text+="Logging: ${LOGGING:-false}\n"
-    review_text+="Verbose Output: ${VERBOSE:-false}\n"
-    review_text+="Automatic Backup: ${BACKUP:-false}\n"
+    review_text=$(cat $settings_file)
     
     # Show review dialog
     dialog --title "Settings Review" \
@@ -311,11 +836,16 @@ while true; do
         5)
             rm -f $TEMP_FILE
             if [ -n "$SETTINGS_FILE" ]; then
+                clear
                 echo $SETTINGS_FILE > .selected_settings
                 exit 0
             else
+                clear
                 exit 1
             fi
             ;;
     esac
 done
+
+# Add trap to clean up temp files
+trap 'rm -f "$TEMP_FILE"' EXIT

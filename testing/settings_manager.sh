@@ -150,51 +150,138 @@ select_OS() {
         source "$settings_file"
         local ${OSTYPE:=$OSTYPE}
         local ${MAJOROSVERSION:=$MAJOROSVERSION}
+        local ${ISOFFLINEREPO:=$ISOFFLINEREPO}
+        local ${OFFLINEREPO:=$OFFLINEREPO}
     else
-        local OSTYPE="None"
-        local MAJOROSVERSION="Selected"
+        local OSTYPE="RHEL"
+        local MAJOROSVERSION="8"
+        local ISOFFLINEREPO="false"
+        local OFFLINEREPO=""
     fi
 
     # OS Flavor Selection
-    choice_os=$(dialog --clear --title "Select Linux Distribution" \
-                        --menu "Current OS selected: [$OSTYPE $MAJOROSVERSION]" 10 50 5 \
-                        "RHEL" "Red Hat Enterprise Linux" \
-                        "CentOS" "CentOS Linux" \
-                        2>&1 1>/dev/tty)
-    ret=$?
-    if [[ $ret -ne 0 ]]; then  # Handle Cancel
-      return 1
-    fi
+    while true; do
+        choice_os=$(dialog --clear --title "Select Linux Distribution" \
+                            --menu "Current OS selected: [$OSTYPE $MAJOROSVERSION]" 13 50 5 \
+                            "RHEL" "Red Hat Enterprise Linux" \
+                            "CentOS" "CentOS Linux" \
+                            "Offline_Repo" "Current Repo:${OFFLINEREPO:- none} " \
+                            "Continue" "Save and Continue" \
+                            2>&1 1>/dev/tty)
+        ret=$?
+        if [[ $ret -ne 0 ]]; then  # Handle Cancel
+        return 1
+        fi
 
-    # Populate Versions based on Flavor (Example)
-    case "$choice_os" in
-        "RHEL")
-            choice_os_version=$(dialog --clear --title "Select RHEL OS version" \
-                          --menu "Choose the OS distribution:" 10 50 5 \
-                          "8" "Red Hat Enterprise Linux 8" \
-                          "9" "Red Hat Enterprise Linux 9" \
-                          2>&1 1>/dev/tty)  # RHEL versions
-            ;;
-        "CentOS")
-            choice_os_version=$(dialog --clear --title "Select CentOS version" \
-                          --menu "Choose the OS distribution:" 10 50 5 \
-                          "8" "CentOS Linux Stream 8" \
-                          "9" "CentOS Linux Stream 9" \
-                          2>&1 1>/dev/tty)
-            ;;
-        *)
-            echo "Invalid OS flavor selected." >&2 # Error to stderr
-            return 1
-            ;;
-    esac
-
-    # Store choices
-    echo "OSTYPE=\"$choice_os\""
-    echo "MAJOROSVERSION=\"$choice_os_version\""
-    return 0
+        # Populate Versions based on Flavor (Example)
+        while true; do
+            case "$choice_os" in
+                "RHEL")
+                    choice_os_version=$(dialog --clear --title "Select RHEL OS version" \
+                                --menu "Choose the OS distribution:" 10 50 5 \
+                                "8" "Red Hat Enterprise Linux 8" \
+                                "9" "Red Hat Enterprise Linux 9" \
+                                2>&1 1>/dev/tty)  # RHEL versions
+                    OSTYPE="RHEL"
+                    MAJOROSVERSION="$choice_os_version"
+                    break
+                    ;;
+                "CentOS")
+                    choice_os_version=$(dialog --clear --title "Select CentOS version" \
+                                --menu "Choose the OS distribution:" 10 50 5 \
+                                "8" "CentOS Linux Stream 8" \
+                                "9" "CentOS Linux Stream 9" \
+                                2>&1 1>/dev/tty) # CentOS versions
+                    OSTYPE="CentOS"
+                    MAJOROSVERSION="$choice_os_version"
+                    break
+                    ;;
+                "Offline_Repo")
+                        OFFLINEREPO=$(dialog --clear --inputbox \
+                        "Enter offline repo server address. (ex: https://repo.mil/offline):" 8 $WIDTH "$OFFLINEREPO" \
+                        2>&1 >/dev/tty)
+                    break
+                    ;;
+                "Continue")    
+                    echo "OSTYPE=\"$OSTYPE\""
+                    echo "MAJOROSVERSION=\"$MAJOROSVERSION\""
+                    [[ -n "$OFFLINEREPO" ]] && echo "ISOFFLINEREPO=\"true\""
+                    [[ -n "$OFFLINEREPO" ]] && echo "OFFLINEREPO=\"$OFFLINEREPO\""
+                    return 0
+                    ;;
+                *)
+                    echo "Invalid OS flavor selected." >&2 # Error to stderr
+                    return 1
+                    ;;
+            esac
+        done
+    done
+    # # Store choices
+    # echo "OSTYPE=\"$choice_os\""
+    # echo "MAJOROSVERSION=\"$choice_os_version\""
+    # echo "ISOFFLINEREPO=\"$ISOFFLINEREPO\""
+    # [[ -n "$OFFLINEREPO" ]] && echo "OFFLINEREPO=\"$OFFLINEREPO\""
+    # return 0
 }
 
 # Function to manage user settigns
+manage_time_settings() {
+    local settings_file=$1
+    
+
+    # Source existing settings if file exists
+    if [[ -f "$settings_file" ]]; then
+        source "$settings_file"
+        local ${TIMEZONE:=$TIMEZONE}
+        if [[-n "$NTP_SERVERS"]]; then
+            local ${NTP_SERVERS:-$NTP_SERVERS}
+            # IFS=',' read -ra NTP_SERVERS <<< "$NTP_SERVERS" ##if items need to be stored in an array for processing
+        fi
+    else
+        local TIMEZONE="Etc/UTC"
+        local NTP_SERVERS=""
+    fi
+
+    while true; do
+        sub_choice=$(dialog --clear --title "Edit Time Settings" \
+                --menu "Please select an option:" $HEIGHT $WIDTH 5 \
+                1 "Edit Timezone [$TIMEZONE]" \
+                2 "Edit NTP Servers [Current: ${NTP_SERVERS:-none}]" \
+                3 "Continue" \
+                2>&1 >/dev/tty)
+        ret=$?
+
+        # Check if user pressed Cancel or ESC
+        if [[ $ret -ne 0 ]]; then
+            clear
+            return 1
+        fi
+            
+        if [[ $ret -eq 0 ]]; then
+            while true; do
+                case "$sub_choice" in
+                    1)
+                        new_value=$(dialog --clear --inputbox "Enter Timezone:" 8 $WIDTH "$TIMEZONE" 2>&1 >/dev/tty)
+                        [[ $? -eq 0 ]] && TIMEZONE="$new_value"
+                        break
+                        ;;
+                    2)
+                        new_value=$(dialog --clear --inputbox "Enter NTP SERVERS. Comma delimited:" 8 $WIDTH "$NTP_SERVERS" 2>&1 >/dev/tty)
+                        [[ $? -eq 0 ]] && NTP_SERVERS="'${new_value// /}'"
+                        break
+                        ;;
+                    3)
+                        printf "%s\n" "TIMEZONE=\"$TIMEZONE\""
+                        [[ -n "$NTP_SERVERS" ]] && printf "%s\n" "NTP_SERVERS=\"$NTP_SERVERS\""
+                        return 0
+                        ;;
+                esac
+            done
+        fi
+    done
+
+}
+
 # Function to manage user settings
 manage_user_settings() {
     local settings_file=$1
@@ -483,8 +570,11 @@ create_new_settings() {
     # OS Selection Options
     local os_selection=$(select_OS)
 
-    #Create User Settings
+    # Create User Settings
     local user_selection=$(manage_user_settings)
+
+    # Create time settings
+    local time_options=$(manage_time_settings)
     
     # Create Security options
     manage_security_settings
@@ -521,6 +611,11 @@ create_new_settings() {
     # Process User Selection
     for opt in $user_selection; do 
         echo "${opt//■/ }" >> $SETTINGS_FILE 
+    done
+
+    # Process time settings
+    for opt in $time_options; do 
+        echo "${opt}" >> $SETTINGS_FILE 
     done
 
     # Process options
@@ -576,6 +671,9 @@ edit_settings() {
     #Edit User Settings
     local user_selection=$(manage_user_settings "$settings_file")
 
+    # Create time settings
+    local time_options=$(manage_time_settings "$settings_file")
+
     # Edit Security Settings - pass both the settings file and temp file
     manage_security_settings "$settings_file"
     local security_options=$(cat $TEMP_FILE)
@@ -621,8 +719,13 @@ edit_settings() {
         done
         
         # Process OS Selection
-        for opt in $os_selection; do  #Test this!!!!!!!
-            echo "${opt}" >> $temp_settings  #not sure what output will be
+        for opt in $os_selection; do 
+            echo "${opt}" >> $temp_settings 
+        done
+
+        # Process time settings
+        for opt in $time_options; do 
+            echo "${opt}" >> $temp_settings 
         done
 
         # Set selected options to true
@@ -666,15 +769,7 @@ review_settings() {
     # Source the settings file
     source "$settings_file"
     
-    # Prepare review text
-    review_text="Current Settings in $settings_file:\n\n"
-    review_text+="Project Name: $PROJECT_NAME\n"
-    review_text+="Output Directory: $OUTPUT_DIR\n\n"
-    review_text+="Options:\n"
-    review_text+="Debug Mode: ${DEBUG:-false}\n"
-    review_text+="Logging: ${LOGGING:-false}\n"
-    review_text+="Verbose Output: ${VERBOSE:-false}\n"
-    review_text+="Automatic Backup: ${BACKUP:-false}\n"
+    review_text=$(cat $settings_file)
     
     # Show review dialog
     dialog --title "Settings Review" \

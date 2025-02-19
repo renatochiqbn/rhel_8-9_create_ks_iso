@@ -10,7 +10,7 @@ chmod +x settings_manager.sh process_settings.sh
 # Check if settings file was successfully created/loaded
 if [ $? -eq 0 ]; then
     # Run the processing script
-    ./process_settings.sh
+    ./create-ks-iso.sh
 else
     echo "Settings configuration failed. Exiting."
     exit 1
