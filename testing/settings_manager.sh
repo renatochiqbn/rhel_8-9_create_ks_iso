@@ -373,16 +373,16 @@ manage_user_settings() {
                     ;;
                 4)
                     # Store settings
-                    echo "username_01=\"$username_01\""
-                    echo "username_01_gecos=\"$username_01_gecos\""
-                    [[ -n "$password_username_01" ]] && echo "password_username_01=\"$password_username_01\""
-                    echo "username_02=\"$username_02\""
-                    echo "username_02_gecos=\"$username_02_gecos\""
-                    [[ -n "$password_username_02" ]] && echo "password_username_02=\"$password_username_02\""
-                    echo "username_03=\"$username_03\""
-                    echo "username_03_gecos=\"$username_03_gecos\""
-                    [[ -n "$password_username_03" ]] && echo "password_username_03=\"$password_username_03\""
-                    clear
+                    # ■ ▼
+                    printf "%s\n" "username_01=\"$username_01\""
+                    username_01_gecos="${username_01_gecos// /■}" && printf "username_01_gecos=\"%s\"\n" "$username_01_gecos"
+                    [[ -n "$password_username_01" ]] && password_username_01="${password_username_01// /■}" && printf "%s\n" "password_username_01=\"$password_username_01\""
+                    printf "%s\n" "username_02=\"$username_02\""
+                    username_02_gecos="${username_02_gecos// /■}" && printf "%s\n" "username_02_gecos=\"$username_02_gecos\""
+                    [[ -n "$password_username_02" ]] && password_username_02="${password_username_02// /■}" && printf "%s\n" "password_username_02=\"$password_username_02\""
+                    printf "%s\n" "username_03=\"$username_03\""
+                    username_03_gecos="${username_03_gecos// /■}" && printf "%s\n" "username_03_gecos=\"$username_03_gecos\""
+                    [[ -n "$password_username_03" ]] && password_username_03="${password_username_03// /■}" && printf "%s\n" "password_username_03=\"$password_username_03\""
                     return 0
                     ;;
                 *)
@@ -483,6 +483,9 @@ create_new_settings() {
     # OS Selection Options
     local os_selection=$(select_OS)
 
+    #Create User Settings
+    local user_selection=$(manage_user_settings)
+    
     # Create Security options
     manage_security_settings
     local security_options=$(cat $TEMP_FILE)
@@ -491,9 +494,6 @@ create_new_settings() {
     manage_virtual_settings
     local virtual_options=$(cat $TEMP_FILE)
     
-    #Create User Settings
-    local user_selection=$(manage_user_settings)
-
     # Create Additional Settings
     manage_additional_settings
     local additional_options=$(cat $TEMP_FILE)
@@ -520,7 +520,7 @@ create_new_settings() {
 
     # Process User Selection
     for opt in $user_selection; do 
-        echo "${opt}" >> $SETTINGS_FILE 
+        echo "${opt//■/ }" >> $SETTINGS_FILE 
     done
 
     # Process options
@@ -573,6 +573,9 @@ edit_settings() {
     # OS Selection Options
     local os_selection=$(select_OS "$settings_file")
 
+    #Edit User Settings
+    local user_selection=$(manage_user_settings "$settings_file")
+
     # Edit Security Settings - pass both the settings file and temp file
     manage_security_settings "$settings_file"
     local security_options=$(cat $TEMP_FILE)
@@ -581,9 +584,6 @@ edit_settings() {
     manage_virtual_settings "$settings_file"
     local virtual_options=$(cat $TEMP_FILE)
     
-    #Edit User Settings
-    local user_selection=$(manage_user_settings "$settings_file")
-
     # Edit Security Settings - pass both the settings file and temp file
     manage_additional_settings "$settings_file"
     local additional_options=$(cat $TEMP_FILE)
@@ -643,7 +643,7 @@ edit_settings() {
     
         # Process User Selection
         for opt in $user_selection; do 
-            echo "${opt}" >> $temp_settings 
+            echo "${opt//■/ }" >> $temp_settings 
         done
 
         # Replace original file with new settings
