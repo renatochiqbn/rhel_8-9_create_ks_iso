@@ -233,7 +233,7 @@ manage_time_settings() {
     if [[ -f "$settings_file" ]]; then
         source "$settings_file"
         local ${TIMEZONE:=$TIMEZONE}
-        if [[-n "$NTP_SERVERS"]]; then
+        if [[ -n "$NTP_SERVERS" ]]; then
             local ${NTP_SERVERS:-$NTP_SERVERS}
             # IFS=',' read -ra NTP_SERVERS <<< "$NTP_SERVERS" ##if items need to be stored in an array for processing
         fi
