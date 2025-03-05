@@ -3,3 +3,4 @@ result/*
 testing/.selected_settings
 testing/*.conf
 *.conf
+ISO/*
