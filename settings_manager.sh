@@ -657,8 +657,8 @@ edit_settings() {
     local new_project_name=$(cat $TEMP_FILE)
     
     # Edit output directory
-    dialog --title "Edit Output Directory" \
-           --inputbox "Current output directory:" $HEIGHT $WIDTH "$OUTPUT_DIR" 2>$TEMP_FILE
+    dialog --title "Edit Settings Save Directory" \
+           --inputbox "Current Settings Save directory:" $HEIGHT $WIDTH "$OUTPUT_DIR" 2>$TEMP_FILE
     local new_output_dir=$(cat $TEMP_FILE)
 
     # Media Source Configuration Options

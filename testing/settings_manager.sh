@@ -365,7 +365,6 @@ manage_user_settings() {
                                         break
                                         ;;
                                     4)
-                                        clear
                                         break
                                         ;;
                                 esac
@@ -407,7 +406,6 @@ manage_user_settings() {
                                         break
                                         ;;
                                     4)
-                                        clear
                                         break
                                         ;;
                                 esac
@@ -589,8 +587,8 @@ create_new_settings() {
     local additional_options=$(cat $TEMP_FILE)
     
     # Get output directory
-    dialog --title "Output Directory" \
-           --inputbox "Enter output directory:" $HEIGHT $WIDTH "./" 2>$TEMP_FILE
+    dialog --title "Project Settings Save Directory" \
+           --inputbox "Enter Project Settings Save directory:" $HEIGHT $WIDTH "./" 2>$TEMP_FILE
     OUTPUT_DIR=$(cat $TEMP_FILE)
     
     # Save settings to file
@@ -644,52 +642,261 @@ create_new_settings() {
 }
 
 # Function to edit existing settings
+# edit_settings() {
+#     local settings_file=$1
+#     local temp_settings=$(mktemp)
+    
+#     # Source existing settings
+#     source "$settings_file"
+    
+#     #
+#     while true; do
+#         dialog --title "Edit Settings" \
+#             --menu "Choose an option:" $HEIGHT $WIDTH 4 \
+#             1 "Edit Project Name ["$PROJECT_NAME"] and Save Directory ["$OUTPUT_DIR"]" \
+#             2 "Edit Project Media Settings ["$OSTYPE $MAJOROSVERSION"]" \
+#             3 "Edit User settings" \
+#             4 "Edit Security settings" \
+#             5 "Edit Virtualization settings" \
+#             6 "Edit Additional settings" \
+#             7 "Save and Exit Edit Settings" 2>"$TEMP_FILE"
+        
+#         # ret=$?
+
+#             # Check if user pressed Cancel or ESC
+#             # if [[ $? -ne 0 ]]; then
+#             #     clear
+#             #     # return 1
+#             #     dialog --title "Cancelled" --msgbox "Operation cancelled." 8 40
+#             #     break
+#             # fi
+#         choice=$(cat "$TEMP_FILE")
+#         case "$choice" in
+#             1)
+#                 # Edit project name
+#                 dialog --title "Edit Project Name" \
+#                     --inputbox "Current project name:" $HEIGHT $WIDTH "$PROJECT_NAME" 2>$TEMP_FILE
+#                 local new_project_name=$(cat $TEMP_FILE)
+                
+#                 # Edit output directory
+#                 dialog --title "Edit Project Settings Save Directory" \
+#                     --inputbox "Current project settings save directory:" $HEIGHT $WIDTH "$OUTPUT_DIR" 2>$TEMP_FILE
+#                 local new_output_dir=$(cat $TEMP_FILE)
+#                 ;;
+#             2)
+#                 # Media Source Configuration Options
+#                 select_media "$settings_file"
+#                 local media_options=$(cat $TEMP_FILE)
+
+#                 # OS Selection Options
+#                 local os_selection=$(select_OS "$settings_file")
+#                 ;;
+#             3)
+#                 #Edit User Settings
+#                 local user_selection=$(manage_user_settings "$settings_file")
+#                 ;;
+#             4)
+#                 # Edit Security Settings - pass both the settings file and temp file
+#                 manage_security_settings "$settings_file"
+#                 local security_options=$(cat $TEMP_FILE)
+#                 ;;
+#             5)
+#                 # Edit Security Settings
+#                 manage_virtual_settings "$settings_file"
+#                 local virtual_options=$(cat $TEMP_FILE)
+#                 ;;
+#             6)
+#                 # Edit Additional Settings
+#                 manage_additional_settings "$settings_file"
+#                 local additional_options=$(cat $TEMP_FILE)
+
+#                 # Create time settings
+#                 local time_options=$(manage_time_settings "$settings_file")
+#                 ;;
+#             7)
+#                 break
+#                 ;;
+#         esac
+#     done
+#     #
+
+#     # Show confirmation dialog
+#     dialog --title "Confirm Changes" \
+#            --yesno "Save changes to $settings_file?" 8 40
+    
+#     if [ $? -eq 0 ]; then
+#         # Save new settings
+#         echo "PROJECT_NAME='$new_project_name'" > "$temp_settings"
+#         echo "OUTPUT_DIR='$new_output_dir'" >> "$temp_settings"
+
+#         # Reset security options to false in temp settings
+#         echo "ENABLEFIPS=false" >> "$temp_settings"
+#         echo "ENABLELUKS=false" >> "$temp_settings"
+#         echo "APPLYOPENSCAPSTIG=false" >> "$temp_settings"
+
+#         # Reset virtualization options to false in temp settings
+#         echo "ISVIRTUALPLATFORM=false" >> "$temp_settings"
+#         echo "PCIPASSTHROUGH=false" >> "$temp_settings"
+#         echo "INTELCPU=false" >> "$temp_settings"
+
+#         # Reset additional options to false in temp settings
+#         echo "CREATEBOOTISO=false" >> "$temp_settings"
+#         echo "KSINBOOTISO=false" >> "$temp_settings"
+#         echo "WRITEPASSWDS=false" >> "$temp_settings"
+#         echo "WRITESSHKEYS=false" >> "$temp_settings"
+#         echo "SERIALDISPLAY=false" >> "$temp_settings"
+#         echo "DEBUG=false" >> "$temp_settings"
+        
+#         # Select media processing
+#         for opt in $media_options; do
+#             echo "${opt}" >> $temp_settings
+#         done
+        
+#         # Process OS Selection
+#         for opt in $os_selection; do 
+#             echo "${opt}" >> $temp_settings 
+#         done
+
+#         # Process time settings
+#         for opt in $time_options; do 
+#             echo "${opt}" >> $temp_settings 
+#         done
+
+#         # Set selected options to true
+#         for opt in $security_options; do
+#             opt=$(echo $opt | tr -d '"')
+#             sed -i "s/${opt}=false/${opt}=true/" "$temp_settings"
+#         done
+
+#         for opt in $virtual_options; do
+#             opt=$(echo $opt | tr -d '"')
+#             sed -i "s/${opt}=false/${opt}=true/" "$temp_settings"
+#         done
+
+#         for opt in $additional_options; do
+#             opt=$(echo $opt | tr -d '"')
+#             sed -i "s/${opt}=false/${opt}=true/" "$temp_settings"
+#         done
+    
+#         # Process User Selection
+#         for opt in $user_selection; do 
+#             echo "${opt//■/ }" >> $temp_settings 
+#         done
+
+#         # Replace original file with new settings
+#         mv "$temp_settings" "$settings_file"
+        
+#         dialog --title "Success" \
+#                --msgbox "Changes saved to $settings_file" 8 40
+#     else
+#         rm -f "$temp_settings"
+#         dialog --title "Cancelled" \
+#                --msgbox "No changes were saved" 8 40
+#     fi
+
+# }
+
 edit_settings() {
     local settings_file=$1
     local temp_settings=$(mktemp)
-    
+    # local TEMP_FILE=$(mktemp) # Add local temp_file to this function.
+
     # Source existing settings
     source "$settings_file"
-    
-    # Edit project name
-    dialog --title "Edit Project Name" \
-           --inputbox "Current project name:" $HEIGHT $WIDTH "$PROJECT_NAME" 2>$TEMP_FILE
-    local new_project_name=$(cat $TEMP_FILE)
-    
-    # Edit output directory
-    dialog --title "Edit Output Directory" \
-           --inputbox "Current output directory:" $HEIGHT $WIDTH "$OUTPUT_DIR" 2>$TEMP_FILE
-    local new_output_dir=$(cat $TEMP_FILE)
 
-    # Media Source Configuration Options
-    select_media "$settings_file"
-    local media_options=$(cat $TEMP_FILE)
+    while true; do
+        dialog --title "Edit Settings" \
+            --menu "Choose an option:" $HEIGHT $WIDTH 7 \
+            1 "Edit Project Name ['$PROJECT_NAME'] and Save Directory ['$OUTPUT_DIR']" \
+            2 "Edit Project Media Settings ['$OSTYPE $MAJOROSVERSION']" \
+            3 "Edit User settings" \
+            4 "Edit Security settings" \
+            5 "Edit Virtualization settings" \
+            6 "Edit Additional settings" \
+            7 "Save and Exit Edit Settings" 2>$TEMP_FILE
 
-    # OS Selection Options
-    local os_selection=$(select_OS "$settings_file")
+        choice_setting=$(cat $TEMP_FILE)
 
-    #Edit User Settings
-    local user_selection=$(manage_user_settings "$settings_file")
+        # Check if user pressed Cancel or ESC on the main menu
+        if [[ $ret -ne 0 ]]; then
+            clear
+            dialog --title "Cancelled" --msgbox "Operation cancelled." 8 40
+            rm -f "$TEMP_FILE"
+            rm -f "$temp_settings"
+            return 1 # return 1 when dialog is cancelled
+        fi
 
-    # Create time settings
-    local time_options=$(manage_time_settings "$settings_file")
+        choice_setting=$(cat "$TEMP_FILE")
+        case "$choice_setting" in
+            1)
+                # Edit project name
+                dialog --title "Edit Project Name" \
+                    --inputbox "Current project name:" $HEIGHT $WIDTH "$PROJECT_NAME" 2>"$TEMP_FILE"
+                local new_project_name=$(cat "$TEMP_FILE")
+                ret=$?
+                if [[ $ret -ne 0 ]]; then continue; fi #handle cancel in sub dialogs.
 
-    # Edit Security Settings - pass both the settings file and temp file
-    manage_security_settings "$settings_file"
-    local security_options=$(cat $TEMP_FILE)
+                # Edit output directory
+                dialog --title "Edit Project Settings Save Directory" \
+                    --inputbox "Current project settings save directory:" $HEIGHT $WIDTH "$OUTPUT_DIR" 2>"$TEMP_FILE"
+                local new_output_dir=$(cat "$TEMP_FILE")
+                ret=$?
+                if [[ $ret -ne 0 ]]; then continue; fi #handle cancel in sub dialogs.
+                ;;
+            2)
+                # Media Source Configuration Options
+                select_media "$settings_file"
+                local media_options=$(cat "$TEMP_FILE")
+                ret=$?
+                if [[ $ret -ne 0 ]]; then continue; fi #handle cancel in sub dialogs.
 
-    # Edit Security Settings - pass both the settings file and temp file
-    manage_virtual_settings "$settings_file"
-    local virtual_options=$(cat $TEMP_FILE)
-    
-    # Edit Security Settings - pass both the settings file and temp file
-    manage_additional_settings "$settings_file"
-    local additional_options=$(cat $TEMP_FILE)
+                # OS Selection Options
+                local os_selection=$(select_OS "$settings_file")
+                ret=$?
+                if [[ $ret -ne 0 ]]; then continue; fi #handle cancel in sub dialogs.
+                ;;
+            3)
+                # Edit User Settings
+                local user_selection=$(manage_user_settings "$settings_file")
+                ret=$?
+                if [[ $ret -ne 0 ]]; then continue; fi #handle cancel in sub dialogs.
+                ;;
+            4)
+                # Edit Security Settings - pass both the settings file and temp file
+                manage_security_settings "$settings_file"
+                local security_options=$(cat "$TEMP_FILE")
+                ret=$?
+                if [[ $ret -ne 0 ]]; then continue; fi #handle cancel in sub dialogs.
+                ;;
+            5)
+                # Edit Security Settings
+                manage_virtual_settings "$settings_file"
+                local virtual_options=$(cat "$TEMP_FILE")
+                ret=$?
+                if [[ $ret -ne 0 ]]; then continue; fi #handle cancel in sub dialogs.
+                ;;
+            6)
+                # Edit Additional Settings
+                manage_additional_settings "$settings_file"
+                local additional_options=$(cat "$TEMP_FILE")
+                ret=$?
+                if [[ $ret -ne 0 ]]; then continue; fi #handle cancel in sub dialogs.
+
+                # Create time settings
+                local time_options=$(manage_time_settings "$settings_file")
+                ret=$?
+                if [[ $ret -ne 0 ]]; then continue; fi #handle cancel in sub dialogs.
+                ;;
+            7)
+                break
+                ;;
+        esac
+    done
 
     # Show confirmation dialog
     dialog --title "Confirm Changes" \
-           --yesno "Save changes to $settings_file?" 8 40
-    
+        --yesno "Save changes to $settings_file?" 8 40
+
     if [ $? -eq 0 ]; then
         # Save new settings
         echo "PROJECT_NAME='$new_project_name'" > "$temp_settings"
@@ -712,54 +919,56 @@ edit_settings() {
         echo "WRITESSHKEYS=false" >> "$temp_settings"
         echo "SERIALDISPLAY=false" >> "$temp_settings"
         echo "DEBUG=false" >> "$temp_settings"
-        
+
         # Select media processing
-        for opt in $media_options; do
-            echo "${opt}" >> $temp_settings
+        for opt in "${media_options[@]}"; do
+            echo "$opt" >> "$temp_settings"
         done
-        
+
         # Process OS Selection
-        for opt in $os_selection; do 
-            echo "${opt}" >> $temp_settings 
+        for opt in "${os_selection[@]}"; do
+            echo "$opt" >> "$temp_settings"
         done
 
         # Process time settings
-        for opt in $time_options; do 
-            echo "${opt}" >> $temp_settings 
+        for opt in "${time_options[@]}"; do
+            echo "$opt" >> "$temp_settings"
         done
 
         # Set selected options to true
-        for opt in $security_options; do
-            opt=$(echo $opt | tr -d '"')
+        for opt in "${security_options[@]}"; do
+            opt=$(echo "$opt" | tr -d '"')
             sed -i "s/${opt}=false/${opt}=true/" "$temp_settings"
         done
 
-        for opt in $virtual_options; do
-            opt=$(echo $opt | tr -d '"')
+        for opt in "${virtual_options[@]}"; do
+            opt=$(echo "$opt" | tr -d '"')
             sed -i "s/${opt}=false/${opt}=true/" "$temp_settings"
         done
 
-        for opt in $additional_options; do
-            opt=$(echo $opt | tr -d '"')
+        for opt in "${additional_options[@]}"; do
+            opt=$(echo "$opt" | tr -d '"')
             sed -i "s/${opt}=false/${opt}=true/" "$temp_settings"
         done
-    
+
         # Process User Selection
-        for opt in $user_selection; do 
-            echo "${opt//■/ }" >> $temp_settings 
+        for opt in "${user_selection[@]}"; do
+            echo "${opt//■/ }" >> "$temp_settings"
         done
 
         # Replace original file with new settings
         mv "$temp_settings" "$settings_file"
-        
+
         dialog --title "Success" \
-               --msgbox "Changes saved to $settings_file" 8 40
+            --msgbox "Changes saved to $settings_file" 8 40
     else
         rm -f "$temp_settings"
         dialog --title "Cancelled" \
-               --msgbox "No changes were saved" 8 40
+            --msgbox "No changes saved." 8 40
     fi
+    rm -f "$TEMP_FILE" #Remove the local temp file.
 }
+
 
 # Function to review settings
 review_settings() {
